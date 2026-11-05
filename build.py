@@ -475,7 +475,11 @@ def verify_package(path: Path, platform: str, version: str) -> None:
 
 def add_tree(entries: list[tuple[Path, str]], root: Path, arcroot: str) -> None:
     entries.append((root, arcroot))
-    for path in sorted(root.rglob("*")):
+    # Sort by the POSIX archive path so Windows (case-insensitive filesystem
+    # order) and Linux produce identical archives for the same source.
+    for path in sorted(
+        root.rglob("*"), key=lambda item: item.relative_to(root).as_posix()
+    ):
         relative = "./" + path.relative_to(root).as_posix()
         entries.append((path, f"{arcroot.rstrip('/')}/{relative[2:]}"))
 
@@ -541,10 +545,14 @@ def build(platform: str, clean: bool) -> Path:
     )
 
     frontend_entries: list[tuple[Path, str]] = []
-    for source in sorted((ROOT / "frontend").rglob("*")):
+    frontend_root = ROOT / "frontend"
+    for source in sorted(
+        frontend_root.rglob("*"),
+        key=lambda item: item.relative_to(frontend_root).as_posix(),
+    ):
         if source.is_file():
             frontend_entries.append(
-                (source, "./" + source.relative_to(ROOT / "frontend").as_posix())
+                (source, "./" + source.relative_to(frontend_root).as_posix())
             )
     index_source = (ROOT / "frontend" / "index.html").read_text(encoding="utf-8")
     index_built = index_source.replace("__APP_VERSION__", version)
@@ -573,7 +581,11 @@ def build(platform: str, clean: bool) -> Path:
     data_entries: list[tuple[Path, str]] = []
     add_tree(data_entries, staging / "usr", "./usr")
     checksums: list[str] = []
-    for path in sorted((staging / "usr").rglob("*")):
+    usr_root = staging / "usr"
+    for path in sorted(
+        usr_root.rglob("*"),
+        key=lambda item: item.relative_to(usr_root).as_posix(),
+    ):
         if path.is_file():
             relative = path.relative_to(staging).as_posix()
             digest = hashlib.md5(path.read_bytes()).hexdigest()
