@@ -52,7 +52,7 @@ class PackageContractTests(unittest.TestCase):
         version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
         config = json.loads((ROOT / "config.ini").read_text(encoding="utf-8"))
         control = (ROOT / "DEBIAN" / "control").read_text(encoding="utf-8")
-        backend = (ROOT / "backend" / "yuii_reader" / "__init__.py").read_text(
+        backend = (ROOT / "backend" / "shiye" / "__init__.py").read_text(
             encoding="utf-8"
         )
         self.assertEqual(config["version"], version)
@@ -62,13 +62,13 @@ class PackageContractTests(unittest.TestCase):
 
     def test_config_contract(self) -> None:
         config = json.loads((ROOT / "config.ini").read_text(encoding="utf-8"))
-        self.assertEqual(config["id"], "yuii-reader")
+        self.assertEqual(config["id"], "shiye")
         self.assertEqual(config["publisher"], "Yuii")
-        self.assertEqual(config["user"], "yuii-reader")
-        self.assertEqual(config["package"], "yuii-reader")
-        self.assertEqual(config["system_id"], "yuiireader-system")
-        self.assertEqual(config["icon"], "/images/icons/yuii-reader.svg")
-        self.assertEqual(config["path"], "/yuii-reader/")
+        self.assertEqual(config["user"], "shiye")
+        self.assertEqual(config["package"], "shiye")
+        self.assertEqual(config["system_id"], "shiye-system")
+        self.assertEqual(config["icon"], "/images/icons/shiye.svg")
+        self.assertEqual(config["path"], "/shiye/")
         self.assertEqual(config["type"], "iframe")
         self.assertEqual(config["application_type"], "deb")
         self.assertIn("Utilities", config["category"])
@@ -77,25 +77,25 @@ class PackageContractTests(unittest.TestCase):
         self.assertEqual(config["low_version"], "TOS7.0")
 
     def test_service_contract(self) -> None:
-        unit = (ROOT / "init.d" / "yuiireader-system.service").read_text(
+        unit = (ROOT / "init.d" / "shiye-system.service").read_text(
             encoding="utf-8"
         )
-        self.assertIn("User=yuii-reader", unit)
+        self.assertIn("User=shiye", unit)
         self.assertIn("ProtectSystem=strict", unit)
         self.assertIn("ProtectHome=true", unit)
         self.assertNotRegex(unit, r"(?m)^\s*Group\s*=")
         self.assertNotRegex(unit, r"(?mi)^\s*PrivateTmp\s*=\s*(true|yes|1)\s*$")
         self.assertIn(
             "ExecStart=/usr/bin/python3 "
-            "/usr/local/yuii-reader/bin/yuii-reader-service",
+            "/usr/local/shiye/bin/shiye-service",
             unit,
         )
         self.assertIn(
-            "ExecStopPost=-/bin/rm -f /var/api/yuii-reader.sock",
+            "ExecStopPost=-/bin/rm -f /var/api/shiye.sock",
             unit,
         )
         self.assertIn(
-            "EnvironmentFile=-/usr/local/yuii-reader/yuii-reader.env", unit
+            "EnvironmentFile=-/usr/local/shiye/shiye.env", unit
         )
         self.assertIn("TimeoutStopSec=10", unit)
         self.assertIn("KillSignal=SIGTERM", unit)
@@ -103,13 +103,13 @@ class PackageContractTests(unittest.TestCase):
         self.assertIn("MemoryMax=512M", unit)
         self.assertIn("CPUQuota=50%", unit)
         self.assertIn(
-            "ReadWritePaths=/usr/local/yuii-reader/data "
-            "/usr/local/yuii-reader/logs /var/api",
+            "ReadWritePaths=/usr/local/shiye/data "
+            "/usr/local/shiye/logs /var/api",
             unit,
         )
 
     def test_language_contract(self) -> None:
-        raw = (ROOT / "yuii-reader.lang").read_bytes()
+        raw = (ROOT / "shiye.lang").read_bytes()
         self.assertFalse(raw.startswith(b"\xef\xbb\xbf"))
         self.assertNotIn(b"\r\n", raw)
         self.assertNotIn(b"\r", raw)
@@ -126,7 +126,7 @@ class PackageContractTests(unittest.TestCase):
         version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
         parser = configparser.ConfigParser(interpolation=None)
         parser.optionxform = str
-        parser.read_string((ROOT / "yuii-reader.lang").read_text(encoding="utf-8"))
+        parser.read_string((ROOT / "shiye.lang").read_text(encoding="utf-8"))
         for section in parser.sections():
             self.assertTrue(
                 parser[section]["release_note"].strip().strip('"').startswith(version),
@@ -187,23 +187,23 @@ class PackageContractTests(unittest.TestCase):
         self.assertTrue((ROOT / "frontend" / "favicon.svg").is_file())
 
     def test_backend_layout(self) -> None:
-        backend = ROOT / "backend" / "yuii_reader"
+        backend = ROOT / "backend" / "shiye"
         for name in REQUIRED_BACKEND:
             self.assertTrue((backend / name).is_file(), name)
-        entry = ROOT / "backend" / "yuii-reader-service"
+        entry = ROOT / "backend" / "shiye-service"
         self.assertTrue(entry.is_file())
         text = entry.read_text(encoding="utf-8")
-        self.assertIn("from yuii_reader.server import main", text)
+        self.assertIn("from shiye.server import main", text)
         self.assertIn("sys.path", text)
 
     def test_frontend_contract(self) -> None:
         html = (ROOT / "frontend" / "index.html").read_text(encoding="utf-8")
         script = (ROOT / "frontend" / "app.js").read_text(encoding="utf-8")
         theme = (ROOT / "frontend" / "theme.js").read_text(encoding="utf-8")
-        server = (ROOT / "backend" / "yuii_reader" / "server.py").read_text(
+        server = (ROOT / "backend" / "shiye" / "server.py").read_text(
             encoding="utf-8"
         )
-        service = (ROOT / "backend" / "yuii_reader" / "service.py").read_text(
+        service = (ROOT / "backend" / "shiye" / "service.py").read_text(
             encoding="utf-8"
         )
         for element_id in (
@@ -246,9 +246,9 @@ class PackageContractTests(unittest.TestCase):
         self.assertNotRegex(html, r"\son[a-z]+\s*=")
         self.assertIn('credentials: "include"', script)
         self.assertIn('cache: "no-store"', script)
-        self.assertIn('health.app !== "yuii-reader"', script)
-        self.assertIn('"/v2/proxy/yuii-reader"', script)
-        self.assertIn('"/yuii-reader"', script)
+        self.assertIn('health.app !== "shiye"', script)
+        self.assertIn('"/v2/proxy/shiye"', script)
+        self.assertIn('"/shiye"', script)
         self.assertIn("fixMediaUrls", script)
         self.assertIn("media?url=", script)
         self.assertIn("localStorage", theme)

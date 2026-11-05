@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: 安全问题
-    url: https://github.com/642671/yuii-reader-tos7/security/advisories/new
+    url: https://github.com/642671/shiye-tos7/security/advisories/new
     about: 请通过私密漏洞报告提交，不要公开提 issue。
   - name: 使用与安装问题
-    url: https://github.com/642671/yuii-reader-tos7/blob/main/README.md
+    url: https://github.com/642671/shiye-tos7/blob/main/README.md
     about: 先阅读 README 的安装、构建和已知限制。

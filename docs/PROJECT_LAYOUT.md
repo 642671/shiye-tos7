@@ -1,11 +1,11 @@
 # 项目目录
 
 ```text
-yuii-reader-tos7/
+shiye-tos7/
 ├─ VERSION                          当前版本号（0.1.0）
 ├─ config.ini                       TOS 应用元数据（JSON）
-├─ yuii-reader.lang                 14 种语言的商店文案
-├─ yuii-reader.env                  systemd 环境变量
+├─ shiye.lang                       14 种语言的商店文案
+├─ shiye.env                        systemd 环境变量
 ├─ LICENSE                          MIT
 ├─ README.md                        安装、开发、限制
 ├─ CHANGELOG.md                     版本记录
@@ -15,8 +15,8 @@ yuii-reader-tos7/
 ├─ ROADMAP.md                       版本方向
 │
 ├─ backend/
-│  ├─ yuii-reader-service           启动入口（设置 sys.path 后调用 main）
-│  ├─ yuii_reader/
+│  ├─ shiye-service                  启动入口（设置 sys.path 后调用 main）
+│  ├─ shiye/
 │  │  ├─ __init__.py                APP_ID / APP_NAME / __version__
 │  │  ├─ feeds.py                   HTTP 抓取、编码识别、RSS/RDF/Atom、OPML
 │  │  ├─ sanitize.py                HTML 白名单、跟踪参数、图片代理、文本提取
@@ -44,7 +44,7 @@ yuii-reader-tos7/
 │  └─ frontend_tools.test.js        node:test 前端纯函数测试
 │
 ├─ init.d/
-│  └─ yuiireader-system.service     systemd 单元
+│  └─ shiye-system.service           systemd 单元
 │
 ├─ DEBIAN/
 │  ├─ control                       包元数据
@@ -53,7 +53,7 @@ yuii-reader-tos7/
 │  └─ postrm                        卸载清理（purge 删除用户/组）
 │
 ├─ images/icons/
-│  └─ yuii-reader.svg               应用图标（64×64 viewBox）
+│  └─ shiye.svg                     应用图标（64×64 viewBox）
 │
 ├─ docs/
 │  ├─ ARCHITECTURE.md               运行时、数据模型、API、打包
@@ -76,19 +76,19 @@ yuii-reader-tos7/
 
 | 安装后路径 | 源码 |
 | --- | --- |
-| `/usr/local/yuii-reader/webui/` | `frontend/` 打包为 `webui.bz2` 后解压 |
-| `/usr/local/yuii-reader/lib/yuii_reader/` | `backend/yuii_reader/` |
-| `/usr/local/yuii-reader/bin/yuii-reader-service` | `backend/yuii-reader-service` |
-| `/etc/systemd/system/yuiireader-system.service` | `init.d/yuiireader-system.service` |
-| `/usr/local/yuii-reader/data/yuii-reader.db` | 运行时生成 |
-| `/var/api/yuii-reader.sock` | 运行时生成 |
+| `/usr/local/shiye/webui/` | `frontend/` 打包为 `webui.bz2` 后解压 |
+| `/usr/local/shiye/lib/shiye/` | `backend/shiye/` |
+| `/usr/local/shiye/bin/shiye-service` | `backend/shiye-service` |
+| `/etc/systemd/system/shiye-system.service` | `init.d/shiye-system.service` |
+| `/usr/local/shiye/data/shiye.db` | 运行时生成 |
+| `/var/api/shiye.sock` | 运行时生成 |
 
 ## 哪些文件不要手改
 
 - `dist/`：由 `build.py` 生成。
 - `__pycache__/`、`data/`、`logs/`：运行时产物，已在 `.gitignore` 中。
 - `.deb`、`.sha256`：发布资产，只能由构建生成。
-- `yuii-reader.lang` 的 section 数量和字段名：打包和契约测试会校验。
+- `shiye.lang` 的 section 数量和字段名：打包和契约测试会校验。
 
 ## 新增文件时的检查清单
 

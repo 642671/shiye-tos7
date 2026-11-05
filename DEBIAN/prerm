@@ -1,8 +1,8 @@
 #!/bin/sh
 set -e
 
-APP_ID="yuii-reader"
-SYSTEM_ID="yuiireader-system"
+APP_ID="shiye"
+SYSTEM_ID="shiye-system"
 SOCKET_PATH="/var/api/${APP_ID}.sock"
 
 case "$1" in

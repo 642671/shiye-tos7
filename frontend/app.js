@@ -1,8 +1,8 @@
 (function () {
   "use strict";
 
-  var Tools = window.YuiiTools;
-  var Theme = window.YuiiTheme;
+  var Tools = window.ShiyeTools;
+  var Theme = window.ShiyeTheme;
 
   function $(id) {
     return document.getElementById(id);
@@ -88,7 +88,7 @@
 
   function detectApiBase() {
     var path = window.location.pathname || "/";
-    var prefixes = ["/v2/proxy/yuii-reader", "/proxy/yuii-reader", "/yuii-reader"];
+    var prefixes = ["/v2/proxy/shiye", "/proxy/shiye", "/shiye"];
     for (var i = 0; i < prefixes.length; i += 1) {
       var prefix = prefixes[i];
       if (path === prefix || path === prefix + "/" || path.indexOf(prefix + "/") === 0) {
@@ -153,7 +153,7 @@
         }
         setConnection("error", "服务离线");
         throw new AppError(
-          "无法连接 Yuii Reader 服务，请确认应用正在运行。",
+          "无法连接拾页服务，请确认应用正在运行。",
           "offline",
           "offline",
           0
@@ -1136,7 +1136,7 @@
     }
 
     updateReaderControls();
-    document.title = (article.title || "Yuii Reader") + " · Yuii Reader";
+    document.title = (article.title || "拾页") + " · 拾页";
   }
 
   function updateReaderControls() {
@@ -1791,7 +1791,7 @@
       var url = URL.createObjectURL(blob);
       var anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = "yuii-reader-subscriptions.opml";
+      anchor.download = "shiye-subscriptions.opml";
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
@@ -2004,9 +2004,9 @@
     ui.listMeta.textContent = "正在连接服务…";
     try {
       var health = await Api.get("health");
-      if (!health || health.app !== "yuii-reader") {
+      if (!health || health.app !== "shiye") {
         throw new AppError(
-          "服务响应异常，请确认 Yuii Reader 已正确安装。",
+          "服务响应异常，请确认拾页已正确安装。",
           "invalid_health",
           "gateway",
           200

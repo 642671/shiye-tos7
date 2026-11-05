@@ -1,4 +1,4 @@
-"""HTTP server for Yuii Reader over a Unix socket or local TCP port."""
+"""HTTP server for Shiye over a Unix socket or local TCP port."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from typing import Any
 from . import APP_ID, __version__
 from .service import AppService, ServiceError
 
-LOGGER = logging.getLogger("yuii_reader.server")
+LOGGER = logging.getLogger("shiye.server")
 
 MAX_JSON_BYTES = 2 * 1024 * 1024
 MAX_OPML_BYTES = 4 * 1024 * 1024
@@ -82,7 +82,7 @@ def _query_value(query: dict[str, list[str]], name: str, default: str = "") -> s
 
 class AppHandler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
-    server_version = f"YuiiReader/{__version__}"
+    server_version = f"Shiye/{__version__}"
     sys_version = ""
 
     @property
@@ -353,7 +353,7 @@ class AppHandler(BaseHTTPRequestHandler):
                     "text/x-opml; charset=utf-8",
                     extra_headers={
                         "Content-Disposition": (
-                            'attachment; filename="yuii-reader-subscriptions.opml"'
+                            'attachment; filename="shiye-subscriptions.opml"'
                         )
                     },
                 )
@@ -577,7 +577,7 @@ def make_server(
 
 
 def _configure_logging() -> None:
-    level_name = os.environ.get("YUII_READER_LOG_LEVEL", "INFO").upper()
+    level_name = os.environ.get("SHIYE_LOG_LEVEL", "INFO").upper()
     level = getattr(logging, level_name, logging.INFO)
     logging.basicConfig(
         level=level,
@@ -591,16 +591,16 @@ def main() -> int:
     here = os.path.dirname(os.path.abspath(__file__))
     default_root = os.path.dirname(os.path.dirname(here))
     data_dir = os.environ.get(
-        "YUII_READER_DATA_DIR", os.path.join(default_root, "data")
+        "SHIYE_DATA_DIR", os.path.join(default_root, "data")
     )
     frontend_dir = os.environ.get(
-        "YUII_READER_FRONTEND_DIR", os.path.join(default_root, "frontend")
+        "SHIYE_FRONTEND_DIR", os.path.join(default_root, "frontend")
     )
     socket_path = os.environ.get(
-        "YUII_READER_SOCKET", f"/var/api/{APP_ID}.sock"
+        "SHIYE_SOCKET", f"/var/api/{APP_ID}.sock"
     )
-    host = os.environ.get("YUII_READER_HOST", "127.0.0.1")
-    port_raw = os.environ.get("YUII_READER_PORT", "").strip()
+    host = os.environ.get("SHIYE_HOST", "127.0.0.1")
+    port_raw = os.environ.get("SHIYE_PORT", "").strip()
 
     service = AppService(data_dir, frontend_dir=frontend_dir)
     server: socketserver.BaseServer | None = None

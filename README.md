@@ -1,15 +1,15 @@
-# Yuii Reader
+# 拾页
 
-Yuii Reader 是一个面向 TOS 7 的原生 RSS / Atom 阅读器。它把订阅、分类、已读状态、星标、搜索和 OPML 迁移放在一个本地运行的 iframe 应用里，不依赖外部账号，也不把阅读数据上传到第三方。
+拾页是一个面向 TOS 7 的原生 RSS / Atom 阅读器。它把订阅、分类、已读状态、星标、搜索和 OPML 迁移放在一个本地运行的 iframe 应用里，不依赖外部账号，也不把阅读数据上传到第三方。
 
 - 作者与发布者：**Yuii**
 - 当前版本：**0.1.0**
 - 许可证：**MIT**
-- 仓库：<https://github.com/642671/yuii-reader-tos7>
+- 仓库：<https://github.com/642671/shiye-tos7>
 
 ## 设计来源
 
-Yuii Reader 不是对某个项目的代码复刻，而是在产品形态和交互上参考了两个成熟的开源 RSS 阅读器：
+拾页不是对某个项目的代码复刻，而是在产品形态和交互上参考了两个成熟的开源 RSS 阅读器：
 
 - [Miniflux](https://github.com/miniflux/v2)：极简的三栏阅读布局、已读/未读模型、键盘操作和自托管优先的理念。
 - [FreshRSS](https://github.com/FreshRSS/FreshRSS)：订阅分类、OPML 导入导出、刷新策略和长期维护的社区型产品结构。
@@ -18,7 +18,7 @@ Yuii Reader 不是对某个项目的代码复刻，而是在产品形态和交�
 
 ## 界面预览
 
-![Yuii Reader 三栏阅读界面（演示数据）](docs/screenshot.png)
+![拾页三栏阅读界面（演示数据）](docs/screenshot.png)
 
 浅色主题下的三栏布局：左侧订阅与分类，中间文章列表，右侧正文阅读区。截图使用本地演示订阅，不含真实阅读数据。
 
@@ -59,30 +59,30 @@ Yuii Reader 不是对某个项目的代码复刻，而是在产品形态和交�
 安装包由仓库中的 `build.py` 生成。以 x86_64 为例：
 
 ```bash
-sudo dpkg -i yuii-reader_0.1.0_x86_64.deb
+sudo dpkg -i shiye_0.1.0_x86_64.deb
 ```
 
 安装脚本会：
 
-1. 创建 `yuii-reader` 系统用户（可用时加入 `allusers` 组）。
-2. 解压前端资源到 `/usr/local/yuii-reader/webui`。
-3. 安装并启用 `yuiireader-system.service`，启动后等待 `/var/api/yuii-reader.sock` 出现。
-4. 启动失败时把诊断信息写入 `/usr/local/yuii-reader/logs/postinst-diagnostic.txt`。
+1. 创建 `shiye` 系统用户（可用时加入 `allusers` 组）。
+2. 解压前端资源到 `/usr/local/shiye/webui`。
+3. 安装并启用 `shiye-system.service`，启动后等待 `/var/api/shiye.sock` 出现。
+4. 启动失败时把诊断信息写入 `/usr/local/shiye/logs/postinst-diagnostic.txt`。
 
 检查服务状态：
 
 ```bash
-sudo systemctl status yuiireader-system.service
-curl --unix-socket /var/api/yuii-reader.sock http://localhost/api/health
+sudo systemctl status shiye-system.service
+curl --unix-socket /var/api/shiye.sock http://localhost/api/health
 ```
 
-健康检查返回的 JSON 中 `"app"` 必须是 `"yuii-reader"`，只看到 HTTP 200 不足以说明服务正常。
+健康检查返回的 JSON 中 `"app"` 必须是 `"shiye"`，只看到 HTTP 200 不足以说明服务正常。
 
-> 卸载会删除 `/usr/local/yuii-reader`（包括数据库）。卸载前请先在设置中导出 OPML。
+> 卸载会删除 `/usr/local/shiye`（包括数据库）。卸载前请先在设置中导出 OPML。
 
 ```bash
-sudo dpkg -r yuii-reader   # 停止服务并删除应用目录
-sudo dpkg -P yuii-reader   # 额外删除系统用户/组
+sudo dpkg -r shiye   # 停止服务并删除应用目录
+sudo dpkg -P shiye   # 额外删除系统用户/组
 ```
 
 ## 本地开发
@@ -95,10 +95,10 @@ sudo dpkg -P yuii-reader   # 额外删除系统用户/组
 后端不使用第三方依赖。启动一个本地 TCP 实例：
 
 ```bash
-YUII_READER_PORT=8787 \
-YUII_READER_DATA_DIR=./data \
-YUII_READER_FRONTEND_DIR=./frontend \
-python backend/yuii-reader-service
+SHIYE_PORT=8787 \
+SHIYE_DATA_DIR=./data \
+SHIYE_FRONTEND_DIR=./frontend \
+python backend/shiye-service
 ```
 
 然后访问 <http://127.0.0.1:8787/>。
@@ -126,15 +126,15 @@ python build.py --platform aarch64
 
 产物写入 `dist/`：
 
-- `yuii-reader_0.1.0_x86_64.deb` / `.sha256`
-- `yuii-reader_0.1.0_aarch64.deb` / `.sha256`
+- `shiye_0.1.0_x86_64.deb` / `.sha256`
+- `shiye_0.1.0_aarch64.deb` / `.sha256`
 
 构建固定文件属主、时间戳、归档条目顺序和压缩参数，同一工具链下可复现。不同 zlib 版本的压缩流可能产生不同字节，发布资产以对应 `.sha256` 为准。不要通过重命名 `.deb` 伪造架构。
 
 ## 目录结构
 
 ```text
-backend/yuii_reader/     Python 服务（feeds / sanitize / store / service / server）
+backend/shiye/            Python 服务（feeds / sanitize / store / service / server）
 backend/tests/           后端单元测试与打包契约测试
 frontend/                原生 HTML/CSS/JS
 init.d/                  systemd 单元
@@ -144,12 +144,12 @@ docs/                    架构、目录和 TOS 7 规范说明
 tests/                   前端 Node 测试
 build.py                 确定性打包脚本
 config.ini               TOS 应用元数据
-yuii-reader.lang         14 种语言的商店文案
+shiye.lang               14 种语言的商店文案
 ```
 
 ## 数据与隐私
 
-- 数据库位置：`/usr/local/yuii-reader/data/yuii-reader.db`。
+- 数据库位置：`/usr/local/shiye/data/shiye.db`。
 - 应用不收集遥测，不向任何统计服务上报阅读行为。
 - 抓取订阅和图片时，目标站点可见的来源是本机，而不是 TOS 账号。
 - 正文在服务端按白名单清洗后才下发，前端只把清洗后的 HTML 插入阅读区；标题、作者等元数据一律通过 `textContent` 渲染。

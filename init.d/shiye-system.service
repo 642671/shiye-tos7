@@ -1,16 +1,16 @@
 [Unit]
-Description=Yuii Reader WebUI service
+Description=Shiye WebUI service
 After=network.target
 StartLimitBurst=5
 StartLimitIntervalSec=60
 
 [Service]
 Type=simple
-User=yuii-reader
-WorkingDirectory=/usr/local/yuii-reader
-ExecStart=/usr/bin/python3 /usr/local/yuii-reader/bin/yuii-reader-service
-ExecStopPost=-/bin/rm -f /var/api/yuii-reader.sock
-EnvironmentFile=-/usr/local/yuii-reader/yuii-reader.env
+User=shiye
+WorkingDirectory=/usr/local/shiye
+ExecStart=/usr/bin/python3 /usr/local/shiye/bin/shiye-service
+ExecStopPost=-/bin/rm -f /var/api/shiye.sock
+EnvironmentFile=-/usr/local/shiye/shiye.env
 TimeoutStartSec=30
 TimeoutStopSec=10
 KillMode=control-group
@@ -25,7 +25,7 @@ ProtectControlGroups=true
 
 # /var/api is a shared TOS directory and must stay writable for the
 # application-owned Unix socket. PrivateTmp is intentionally omitted.
-ReadWritePaths=/usr/local/yuii-reader/data /usr/local/yuii-reader/logs /var/api
+ReadWritePaths=/usr/local/shiye/data /usr/local/shiye/logs /var/api
 LimitNOFILE=65536
 LimitNPROC=256
 MemoryMax=512M

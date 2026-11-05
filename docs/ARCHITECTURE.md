@@ -1,6 +1,6 @@
 # 架构说明
 
-Yuii Reader 是一个单进程、单用户的本地 RSS 阅读器。它刻意保持小：一个 Python 服务、一个 SQLite 文件、一组静态前端资源，没有消息队列、缓存中间件或前端构建链。
+拾页是一个单进程、单用户的本地 RSS 阅读器。它刻意保持小：一个 Python 服务、一个 SQLite 文件、一组静态前端资源，没有消息队列、缓存中间件或前端构建链。
 
 ## 运行时拓扑
 
@@ -8,28 +8,28 @@ Yuii Reader 是一个单进程、单用户的本地 RSS 阅读器。它刻意保
 TOS 7 浏览器 iframe
         │  HTTPS + TOS 会话
         ▼
-TOS iframe 代理 (/v2/proxy/yuii-reader/...)
+TOS iframe 代理 (/v2/proxy/shiye/...)
         │  HTTP over Unix socket
         ▼
-/var/api/yuii-reader.sock
+/var/api/shiye.sock
         │
         ▼
-systemd: yuiireader-system.service
-  └─ python3 backend/yuii-reader-service
+systemd: shiye-system.service
+  └─ python3 backend/shiye-service
        ├─ AppService（业务编排、调度器、线程池）
        ├─ Store（SQLite + WAL）
        ├─ feeds.py（HTTP 抓取 + 解析）
        └─ sanitize.py（HTML 清洗）
         │
         ▼
-/usr/local/yuii-reader/data/yuii-reader.db
+/usr/local/shiye/data/shiye.db
 ```
 
-服务默认只监听 Unix socket。设置 `YUII_READER_PORT` 时改为监听本机 TCP，仅用于开发调试。
+服务默认只监听 Unix socket。设置 `SHIYE_PORT` 时改为监听本机 TCP，仅用于开发调试。
 
 ## 请求处理
 
-1. `server.py` 接收请求，`normalize_path` 去掉 `/v2/proxy/yuii-reader`、`/proxy/yuii-reader`、`/yuii-reader` 前缀。
+1. `server.py` 接收请求，`normalize_path` 去掉 `/v2/proxy/shiye`、`/proxy/shiye`、`/shiye` 前缀。
 2. `/api/*` 进入 `_route_api`，按方法分派到 `AppService`。
 3. 非 API 路径作为静态文件，从 `frontend/` 读取；`index.html` 响应 CSP，其他资源按扩展名设置类型和缓存策略。
 4. 所有业务错误转换为 `ServiceError`，统一输出 `{"error", "code"}` 和对应状态码。
@@ -58,7 +58,7 @@ systemd: yuiireader-system.service
 | GET / POST | `/api/opml` | 导出 / 导入 OPML |
 | GET | `/api/media?url=...` | 图片代理 |
 
-`/api/health` 的响应正文包含 `"app": "yuii-reader"`。前端和运维脚本都必须校验这个字段。
+`/api/health` 的响应正文包含 `"app": "shiye"`。前端和运维脚本都必须校验这个字段。
 
 ## 数据模型
 
@@ -110,7 +110,7 @@ SQLite 使用 WAL、`synchronous=NORMAL`、外键约束和 10 秒 busy timeout�
 
 ## 调度与并发
 
-- `AppService.start_background()` 启动 `yuii-scheduler` 线程，每 20 秒查询一次 `next_fetch_at <= now` 的订阅。
+- `AppService.start_background()` 启动 `shiye-scheduler` 线程，每 20 秒查询一次 `next_fetch_at <= now` 的订阅。
 - 抓取任务提交到 `ThreadPoolExecutor(max_workers=3)`，避免慢站点阻塞调度循环。
 - 成功后清空 `error_count`，按全局 `refresh_interval` 计算下次抓取时间。
 - 失败按 5 / 15 / 60 / 180 / 360 分钟退避，达到上限后保持 360 分钟。
@@ -134,7 +134,7 @@ SQLite 使用 WAL、`synchronous=NORMAL`、外键约束和 10 秒 busy timeout�
 `build.py` 负责：
 
 1. 校验版本一致性、14 语言文件、图标、服务契约和前后端文件完整性。
-2. 在临时目录组装 `usr/local/yuii-reader/`，把前端打成 `webui.bz2`。
+2. 在临时目录组装 `usr/local/shiye/`，把前端打成 `webui.bz2`。
 3. 用固定 mtime、uid/gid 0、GNU tar 生成 `control.tar.gz` 和 `data.tar.gz`。
 4. 组装 ar 归档，写入 md5sums 和 SHA256。
 5. 重新读取 `.deb` 验证成员、版本、架构、脚本权限和 webui 内容。

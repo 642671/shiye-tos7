@@ -2,7 +2,7 @@
 
 ## 支持范围
 
-Yuii Reader 目前处于 0.x 阶段，只为最新发布版本提供安全修复。
+拾页目前处于 0.x 阶段，只为最新发布版本提供安全修复。
 
 | 版本 | 支持状态 |
 | --- | --- |
@@ -15,7 +15,7 @@ Yuii Reader 目前处于 0.x 阶段，只为最新发布版本提供安全修复
 
 请使用 GitHub 的私密漏洞报告：
 
-<https://github.com/642671/yuii-reader-tos7/security/advisories/new>
+<https://github.com/642671/shiye-tos7/security/advisories/new>
 
 报告中请包含：
 
@@ -31,7 +31,7 @@ Yuii Reader 目前处于 0.x 阶段，只为最新发布版本提供安全修复
 
 ### 信任边界
 
-- **TOS 会话**：应用自身不做登录鉴权，信任 TOS iframe 代理注入的会话上下文。任何能直接访问 `/var/api/yuii-reader.sock` 的本地进程都可以调用全部 API。
+- **TOS 会话**：应用自身不做登录鉴权，信任 TOS iframe 代理注入的会话上下文。任何能直接访问 `/var/api/shiye.sock` 的本地进程都可以调用全部 API。
 - **订阅源内容**：完全不可信。所有正文在服务端经 `sanitize.py` 白名单清洗后才下发；标题、作者、链接文本等元数据由前端以 `textContent` 渲染。
 - **订阅源地址和图片地址**：不可信 URL。抓取和图片代理都会校验协议、限制体积和超时，但不会阻止私网地址（见下文）。
 

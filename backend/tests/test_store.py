@@ -10,8 +10,8 @@ from pathlib import Path
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
-from yuii_reader.store import DEFAULT_SETTINGS, Store, StoreError
-from yuii_reader.util import iso_after, iso_before
+from shiye.store import DEFAULT_SETTINGS, Store, StoreError
+from shiye.util import iso_after, iso_before
 
 
 class StoreTestCase(unittest.TestCase):

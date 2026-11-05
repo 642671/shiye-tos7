@@ -1,4 +1,4 @@
-"""SQLite persistence for Yuii Reader."""
+"""SQLite persistence for Shiye."""
 
 from __future__ import annotations
 

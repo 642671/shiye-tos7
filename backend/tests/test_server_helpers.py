@@ -14,10 +14,10 @@ from unittest import mock
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
-from yuii_reader import __version__
-from yuii_reader.feeds import FetchResult, ParsedEntry, ParsedFeed
-from yuii_reader.server import make_server, normalize_path
-from yuii_reader.service import AppService
+from shiye import __version__
+from shiye.feeds import FetchResult, ParsedEntry, ParsedFeed
+from shiye.server import make_server, normalize_path
+from shiye.service import AppService
 
 FRONTEND_FILES = {
     "index.html": (
@@ -128,7 +128,7 @@ class ServerTests(unittest.TestCase):
 
     def subscribe(self) -> dict:
         with mock.patch(
-            "yuii_reader.service.fetch_feed",
+            "shiye.service.fetch_feed",
             return_value=(fetch_result(), parsed_feed()),
         ):
             status, _, payload = self.harness.json(
@@ -140,7 +140,7 @@ class ServerTests(unittest.TestCase):
     def test_health_get_and_head(self) -> None:
         status, headers, payload = self.harness.json("GET", "/api/health")
         self.assertEqual(status, 200)
-        self.assertEqual(payload["app"], "yuii-reader")
+        self.assertEqual(payload["app"], "shiye")
         self.assertEqual(payload["status"], "ok")
         self.assertIn("application/json", headers["Content-Type"])
         status, headers, raw = self.harness.request("HEAD", "/api/health")
@@ -150,20 +150,20 @@ class ServerTests(unittest.TestCase):
 
     def test_proxy_prefixes(self) -> None:
         for path in (
-            "/v2/proxy/yuii-reader/api/health",
-            "/proxy/yuii-reader/api/health",
-            "/yuii-reader/api/health",
+            "/v2/proxy/shiye/api/health",
+            "/proxy/shiye/api/health",
+            "/shiye/api/health",
         ):
             status, _, payload = self.harness.json("GET", path)
             self.assertEqual(status, 200, path)
-            self.assertEqual(payload["app"], "yuii-reader")
-        status, _, raw = self.harness.request("GET", "/yuii-reader/")
+            self.assertEqual(payload["app"], "shiye")
+        status, _, raw = self.harness.request("GET", "/shiye/")
         self.assertEqual(status, 200)
         self.assertIn(b'id="app"', raw)
 
     def test_normalize_path(self) -> None:
-        self.assertEqual(normalize_path("/yuii-reader/"), "/")
-        self.assertEqual(normalize_path("/yuii-reader/api/health/"), "/api/health")
+        self.assertEqual(normalize_path("/shiye/"), "/")
+        self.assertEqual(normalize_path("/shiye/api/health/"), "/api/health")
         self.assertEqual(normalize_path("/api/health?x=1"), "/api/health")
         self.assertEqual(normalize_path("api/health"), "/api/health")
 
@@ -263,7 +263,7 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertTrue(payload["feed"]["disabled"])
         with mock.patch(
-            "yuii_reader.service.fetch_feed",
+            "shiye.service.fetch_feed",
             return_value=(fetch_result(), parsed_feed()),
         ):
             status, _, payload = self.harness.json(

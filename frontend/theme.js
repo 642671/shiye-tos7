@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  var STORAGE_KEY = "yuii-reader-theme";
+  var STORAGE_KEY = "shiye-theme";
   var media = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
   var current = "auto";
 
@@ -31,7 +31,7 @@
     document.documentElement.setAttribute("data-theme-preference", current);
     try {
       window.dispatchEvent(
-        new CustomEvent("yuii-theme-change", {
+        new CustomEvent("shiye-theme-change", {
           detail: { preference: current, resolved: resolved },
         })
       );
@@ -70,7 +70,7 @@
     }
   }
 
-  window.YuiiTheme = {
+  window.ShiyeTheme = {
     get: function () {
       return current;
     },

@@ -1,4 +1,4 @@
-"""Application logic for Yuii Reader."""
+"""Application logic for Shiye."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ from .sanitize import html_to_text, sanitize_fragment, summarize_html
 from .store import Store, StoreError
 from .util import clamp_int, clean_text, iso_after, parse_iso, utc_now
 
-LOGGER = logging.getLogger("yuii_reader.service")
+LOGGER = logging.getLogger("shiye.service")
 MAX_MARK_IDS = 500
 MAX_SEARCH_CHARS = 100
 
@@ -50,7 +50,7 @@ class AppService:
         self.data_dir = data_dir
         self.frontend_dir = frontend_dir
         os.makedirs(data_dir, exist_ok=True)
-        self.store = Store(os.path.join(data_dir, "yuii-reader.db"))
+        self.store = Store(os.path.join(data_dir, "shiye.db"))
         self._stop = threading.Event()
         self._scheduler: threading.Thread | None = None
         self._executor: ThreadPoolExecutor | None = None
@@ -71,10 +71,10 @@ class AppService:
                 return
             self._started = True
             self._executor = ThreadPoolExecutor(
-                max_workers=3, thread_name_prefix="yuii-fetch"
+                max_workers=3, thread_name_prefix="shiye-fetch"
             )
         self._scheduler = threading.Thread(
-            target=self._scheduler_loop, name="yuii-scheduler", daemon=True
+            target=self._scheduler_loop, name="shiye-scheduler", daemon=True
         )
         self._scheduler.start()
 
@@ -97,7 +97,7 @@ class AppService:
         with self._executor_lock:
             if self._executor is None:
                 self._executor = ThreadPoolExecutor(
-                    max_workers=3, thread_name_prefix="yuii-fetch"
+                    max_workers=3, thread_name_prefix="shiye-fetch"
                 )
             return self._executor
 
@@ -371,7 +371,7 @@ class AppService:
                 return False
             self._refresh_all_running = True
         thread = threading.Thread(
-            target=self._refresh_all_worker, name="yuii-refresh-all", daemon=True
+            target=self._refresh_all_worker, name="shiye-refresh-all", daemon=True
         )
         thread.start()
         return True

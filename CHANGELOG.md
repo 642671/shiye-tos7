@@ -32,11 +32,15 @@
 - 确定性 `.deb` 打包（固定属主、时间戳、条目顺序），x86_64 / aarch64、SHA256 校验和、14 语言商店文案。
 - 后端单元测试、前端 Node 测试和打包契约测试。
 
+### Changed
+
+- 发布前将应用名调整为「拾页」，应用 ID、仓库名、安装路径、服务名和包名统一使用 `shiye`；发布者仍为 Yuii。
+
 ### Security
 
 - 前端 CSP 禁止内联脚本和外部脚本源。
 - 请求使用 `credentials: include`，由 TOS 代理维护会话，不手写 Cookie。
-- 服务默认只监听 Unix socket `/var/api/yuii-reader.sock`。
+- 服务默认只监听 Unix socket `/var/api/shiye.sock`。
 
 ### Known limitations
 

@@ -1,6 +1,6 @@
 # TOS 7 规范对照与实机验收清单
 
-本文记录 Yuii Reader 对 TOS 7 iframe Deb 应用规范的实现位置，以及尚未在真实设备上完成的验收项。背景根因和更多错误码见工作区的 `TOS7_APP_IFRAME_DEVELOPMENT_NOTES.md`。
+本文记录拾页对 TOS 7 iframe Deb 应用规范的实现位置，以及尚未在真实设备上完成的验收项。背景根因和更多错误码见工作区的 `TOS7_APP_IFRAME_DEVELOPMENT_NOTES.md`。
 
 > 当前状态：Windows 环境下已通过自动化测试、前端检查和双架构打包；**尚未在真实 TOS 7 设备上安装验收**。下方“实机验收”全部未打勾。
 
@@ -8,15 +8,15 @@
 
 | 规范 | 实现 |
 | --- | --- |
-| 应用 ID | `config.ini` 的 `id` = `yuii-reader` |
+| 应用 ID | `config.ini` 的 `id` = `shiye` |
 | 发布者 | `publisher` = `Yuii` |
 | 类型 | `type` = `iframe`，`application_type` = `deb` |
-| 路径 | `/yuii-reader/` |
-| 系统服务名 | `system_id` = `yuiireader-system` |
-| 系统用户 | `user` = `yuii-reader` |
+| 路径 | `/shiye/` |
+| 系统服务名 | `system_id` = `shiye-system` |
+| 系统用户 | `user` = `shiye` |
 | 最低版本 | `low_version` = `TOS7.0` |
-| 图标 | `/images/icons/yuii-reader.svg`，viewBox `0 0 64 64`，≤50 KB |
-| 多语言 | `yuii-reader.lang` 固定 14 个 section |
+| 图标 | `/images/icons/shiye.svg`，viewBox `0 0 64 64`，≤50 KB |
+| 多语言 | `shiye.lang` 固定 14 个 section |
 | 版本 | `VERSION` = `config.ini` = `DEBIAN/control` = `__version__` |
 
 `build.py` 和 `backend/tests/test_package_contract.py` 会校验上述字段，缺一项即失败。
@@ -25,14 +25,14 @@
 
 | 路径 | 内容 |
 | --- | --- |
-| `/usr/local/yuii-reader/bin/yuii-reader-service` | 启动入口 |
-| `/usr/local/yuii-reader/lib/yuii_reader/` | Python 包 |
-| `/usr/local/yuii-reader/webui/` | 解压后的前端 |
-| `/usr/local/yuii-reader/webui.bz2` | 前端压缩包 |
-| `/usr/local/yuii-reader/data/` | SQLite 数据 |
-| `/usr/local/yuii-reader/logs/` | 诊断日志 |
-| `/etc/systemd/system/yuiireader-system.service` | systemd 单元 |
-| `/var/api/yuii-reader.sock` | Unix socket |
+| `/usr/local/shiye/bin/shiye-service` | 启动入口 |
+| `/usr/local/shiye/lib/shiye/` | Python 包 |
+| `/usr/local/shiye/webui/` | 解压后的前端 |
+| `/usr/local/shiye/webui.bz2` | 前端压缩包 |
+| `/usr/local/shiye/data/` | SQLite 数据 |
+| `/usr/local/shiye/logs/` | 诊断日志 |
+| `/etc/systemd/system/shiye-system.service` | systemd 单元 |
+| `/var/api/shiye.sock` | Unix socket |
 
 ## 三、systemd 对照
 
@@ -51,7 +51,7 @@
 ### `postinst`
 
 - 创建 `data/`、`logs/`。
-- `yuii-reader` 用户不存在时创建；`allusers` 组存在则作为主组。
+- `shiye` 用户不存在时创建；`allusers` 组存在则作为主组。
 - 解压 `webui.bz2` 到 `webui/`。
 - 只在 `/var/api` 不存在时创建，并保持平台默认权限（不主动改成非 `1777`）。
 - 安装单元、`daemon-reload`、`enable`、`reset-failed`。
@@ -67,7 +67,7 @@
 ### `postrm`
 
 - 删除单元和 socket，`daemon-reload`、`reset-failed`。
-- `remove` / `purge` 时删除 `/usr/local/yuii-reader`。
+- `remove` / `purge` 时删除 `/usr/local/shiye`。
 - `purge` 时额外删除用户和组。
 - 从不删除 `/var/api` 本身。
 
@@ -82,14 +82,14 @@
 | 禁内联脚本 | `index.html` 无内联 `<script>` 和 `on*` 属性；CSP 为 `script-src 'self'` |
 | 会话请求 | `credentials: "include"`，不手写 `Cookie` |
 | GET 请求 | 不设置 `Content-Type` |
-| 健康检查 | 校验 `health.app !== "yuii-reader"`，不只看 200 |
-| 代理前缀 | 依次尝试 `/v2/proxy/yuii-reader`、`/proxy/yuii-reader`、`/yuii-reader` |
+| 健康检查 | 校验 `health.app !== "shiye"`，不只看 200 |
+| 代理前缀 | 依次尝试 `/v2/proxy/shiye`、`/proxy/shiye`、`/shiye` |
 | 图片 URL | `fixMediaUrls` 把 `api/media?` 改写为当前 API 基地址 |
 
 ## 六、打包
 
-- `python build.py --platform x86_64` → `dist/yuii-reader_0.1.0_x86_64.deb`
-- `python build.py --platform aarch64` → `dist/yuii-reader_0.1.0_aarch64.deb`
+- `python build.py --platform x86_64` → `dist/shiye_0.1.0_x86_64.deb`
+- `python build.py --platform aarch64` → `dist/shiye_0.1.0_aarch64.deb`
 - 每个包附带 `.sha256`。
 - 固定 uid/gid 0、mtime `1704067200`、gzip mtime 0，构建可复现。
 - `verify_package` 会重新读取 ar 成员，检查 control 版本/架构、脚本可执行位、webui 必需文件、`__APP_VERSION__` 替换和 `?v=` 参数。
@@ -101,11 +101,11 @@
 
 ### 安装
 
-- [ ] `sudo dpkg -i yuii-reader_0.1.0_<arch>.deb` 返回 0。
-- [ ] `systemctl status yuiireader-system.service` 为 `active (running)`。
-- [ ] `ls -l /var/api/yuii-reader.sock` 存在，所有者为 `yuii-reader`。
+- [ ] `sudo dpkg -i shiye_0.1.0_<arch>.deb` 返回 0。
+- [ ] `systemctl status shiye-system.service` 为 `active (running)`。
+- [ ] `ls -l /var/api/shiye.sock` 存在，所有者为 `shiye`。
 - [ ] `/var/api` 权限仍为平台默认（通常 `1777`），未被安装脚本修改。
-- [ ] `curl --unix-socket /var/api/yuii-reader.sock http://localhost/api/health` 返回 `"app":"yuii-reader"`。
+- [ ] `curl --unix-socket /var/api/shiye.sock http://localhost/api/health` 返回 `"app":"shiye"`。
 - [ ] `logs/postinst-diagnostic.txt` 不存在（存在则说明启动曾失败）。
 
 ### iframe
@@ -141,7 +141,7 @@
 ### 诊断
 
 - [ ] 人为制造启动失败（例如临时改坏 `ExecStart`），确认 `postinst-diagnostic.txt` 有可读信息。
-- [ ] `journalctl -u yuiireader-system -n 100` 中无反复崩溃循环。
+- [ ] `journalctl -u shiye-system -n 100` 中无反复崩溃循环。
 
 ## 八、已知未覆盖项
 

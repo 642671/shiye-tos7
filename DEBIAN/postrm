@@ -1,9 +1,9 @@
 #!/bin/sh
 set -e
 
-APP_ID="yuii-reader"
-APP_USER="yuii-reader"
-SYSTEM_ID="yuiireader-system"
+APP_ID="shiye"
+APP_USER="shiye"
+SYSTEM_ID="shiye-system"
 APP_DIR="/usr/local/${APP_ID}"
 UNIT_DST="/etc/systemd/system/${SYSTEM_ID}.service"
 SOCKET_PATH="/var/api/${APP_ID}.sock"

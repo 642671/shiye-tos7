@@ -12,7 +12,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: Yuii Reader 版本
+      label: 拾页版本
       description: 设置页或 DEBIAN/control 中的版本号
       placeholder: "0.1.0"
     validations:
@@ -33,7 +33,7 @@ body:
       label: 安装方式
       options:
         - .deb 安装包
-        - 源码运行（python backend/yuii-reader-service）
+        - 源码运行（python backend/shiye-service）
         - 其他
     validations:
       required: true
@@ -70,8 +70,8 @@ body:
     attributes:
       label: 日志
       description: |
-        可附 journalctl -u yuiireader-system -n 100 的输出、
-        /usr/local/yuii-reader/logs/postinst-diagnostic.txt，或浏览器控制台错误。
+        可附 journalctl -u shiye-system -n 100 的输出、
+        /usr/local/shiye/logs/postinst-diagnostic.txt，或浏览器控制台错误。
       render: shell
     validations:
       required: false

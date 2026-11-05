@@ -1,4 +1,4 @@
-"""Small shared helpers for Yuii Reader."""
+"""Small shared helpers for Shiye."""
 
 from __future__ import annotations
 

@@ -11,8 +11,8 @@ from unittest import mock
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
-from yuii_reader.feeds import FetchResult, FeedError, ParsedEntry, ParsedFeed
-from yuii_reader.service import AppService, ServiceError
+from shiye.feeds import FetchResult, FeedError, ParsedEntry, ParsedFeed
+from shiye.service import AppService, ServiceError
 
 
 def make_result(
@@ -78,7 +78,7 @@ class ServiceTestCase(unittest.TestCase):
 
     def subscribe(self, parsed: ParsedFeed | None = None, **kwargs):
         with mock.patch(
-            "yuii_reader.service.fetch_feed",
+            "shiye.service.fetch_feed",
             return_value=(make_result(), parsed or make_parsed()),
         ):
             return self.service.subscribe(
@@ -124,7 +124,7 @@ class SubscribeTests(ServiceTestCase):
     def test_duplicate_feed_is_rejected(self) -> None:
         self.subscribe()
         with mock.patch(
-            "yuii_reader.service.fetch_feed",
+            "shiye.service.fetch_feed",
             return_value=(make_result(), make_parsed()),
         ):
             with self.assertRaises(ServiceError) as caught:
@@ -140,7 +140,7 @@ class SubscribeTests(ServiceTestCase):
 
     def test_fetch_error_is_422(self) -> None:
         with mock.patch(
-            "yuii_reader.service.fetch_feed",
+            "shiye.service.fetch_feed",
             side_effect=FeedError("无法连接订阅源", "network_error"),
         ):
             with self.assertRaises(ServiceError) as caught:
@@ -185,7 +185,7 @@ class RefreshTests(ServiceTestCase):
         )
         parsed = make_parsed(title="Renamed Feed", entries=[entry])
         with mock.patch(
-            "yuii_reader.service.fetch_feed",
+            "shiye.service.fetch_feed",
             return_value=(make_result(etag='W/"v2"'), parsed),
         ):
             result = self.service.refresh_feed(self.feed_id)
@@ -197,7 +197,7 @@ class RefreshTests(ServiceTestCase):
 
     def test_not_modified_updates_fetch_time(self) -> None:
         with mock.patch(
-            "yuii_reader.service.fetch_feed",
+            "shiye.service.fetch_feed",
             return_value=(make_result(not_modified=True), None),
         ):
             result = self.service.refresh_feed(self.feed_id)
@@ -207,7 +207,7 @@ class RefreshTests(ServiceTestCase):
 
     def test_failure_records_backoff(self) -> None:
         with mock.patch(
-            "yuii_reader.service.fetch_feed",
+            "shiye.service.fetch_feed",
             side_effect=FeedError("boom", "http_error"),
         ):
             with self.assertRaises(ServiceError):
@@ -321,7 +321,7 @@ class ManagementTests(ServiceTestCase):
 
     def test_health_and_stats(self) -> None:
         health = self.service.health()
-        self.assertEqual(health["app"], "yuii-reader")
+        self.assertEqual(health["app"], "shiye")
         self.assertEqual(health["status"], "ok")
         self.assertEqual(health["feeds"], 0)
         stats = self.service.stats()

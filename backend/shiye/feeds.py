@@ -1,4 +1,4 @@
-"""Feed fetching, discovery, parsing, OPML and image proxying for Yuii Reader."""
+"""Feed fetching, discovery, parsing, OPML and image proxying for Shiye."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ from .sanitize import html_to_text
 from .util import clean_text, format_utc, utc_now
 
 USER_AGENT = (
-    f"YuiiReader/{__version__} (+https://github.com/642671/yuii-reader-tos7)"
+    f"Shiye/{__version__} (+https://github.com/642671/shiye-tos7)"
 )
 MAX_FEED_BYTES = 5 * 1024 * 1024
 MAX_ENTRIES = 200
@@ -870,7 +870,7 @@ def build_opml(groups: list[tuple[str, list[dict[str, Any]]]]) -> str:
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<opml version="2.0">',
         "  <head>",
-        "    <title>Yuii Reader subscriptions</title>",
+        "    <title>Shiye subscriptions</title>",
         f"    <dateCreated>{xml_escape(now)}</dateCreated>",
         "  </head>",
         "  <body>",

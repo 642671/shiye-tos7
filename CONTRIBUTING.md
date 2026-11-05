@@ -1,6 +1,6 @@
 # 贡献指南
 
-感谢你帮助改进 Yuii Reader。这个项目面向 TOS 7 的长期维护，稳定性和可预测性比功能数量更重要。
+感谢你帮助改进拾页。这个项目面向 TOS 7 的长期维护，稳定性和可预测性比功能数量更重要。
 
 ## 开始之前
 
@@ -69,9 +69,9 @@ python build.py --platform aarch64
 1. 更新 `VERSION`。
 2. 同步 `config.ini` 的 `version`。
 3. 同步 `DEBIAN/control` 的 `Version`。
-4. 同步 `backend/yuii_reader/__init__.py` 的 `__version__`。
+4. 同步 `backend/shiye/__init__.py` 的 `__version__`。
 5. 更新 `CHANGELOG.md`。
-6. 更新 `yuii-reader.lang` 中 14 个语言的 `release_note`，使其以新版本号开头。
+6. 更新 `shiye.lang` 中 14 个语言的 `release_note`，使其以新版本号开头。
 7. 运行完整测试和两个架构的构建。
 8. 打 tag `vX.Y.Z` 并推送，CI 会生成构建产物。
 

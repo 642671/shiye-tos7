@@ -18,8 +18,8 @@ from pathlib import Path
 from typing import Iterable, Mapping
 
 ROOT = Path(__file__).resolve().parent
-APP_ID = "yuii-reader"
-SYSTEM_ID = "yuiireader-system"
+APP_ID = "shiye"
+SYSTEM_ID = "shiye-system"
 PLATFORM_ARCH = {"x86_64": "amd64", "aarch64": "arm64"}
 REQUIRED_LANGUAGES = {
     "zh-cn",
@@ -191,7 +191,7 @@ def validate_icon(path: Path) -> None:
 
 
 def validate_backend_version(version: str) -> None:
-    source = (ROOT / "backend" / "yuii_reader" / "__init__.py").read_text(
+    source = (ROOT / "backend" / "shiye" / "__init__.py").read_text(
         encoding="utf-8"
     )
     if f'__version__ = "{version}"' not in source:
@@ -209,13 +209,13 @@ def validate_frontend() -> None:
     for script in ("theme.js", "tools.js", "app.js"):
         if f'{script}?v=__APP_VERSION__' not in index_source:
             raise SystemExit(f"index.html does not version-bust {script}")
-    server = (ROOT / "backend" / "yuii_reader" / "server.py").read_text(
+    server = (ROOT / "backend" / "shiye" / "server.py").read_text(
         encoding="utf-8"
     )
     for name in REQUIRED_FRONTEND:
         if f'"{name}"' not in server:
             raise SystemExit(f"server.py STATIC_FILES does not declare {name}")
-    backend = ROOT / "backend" / "yuii_reader"
+    backend = ROOT / "backend" / "shiye"
     missing_backend = sorted(
         name for name in REQUIRED_BACKEND if not (backend / name).is_file()
     )
@@ -435,7 +435,7 @@ def verify_package(path: Path, platform: str, version: str) -> None:
             f"./usr/local/{APP_ID}/webui.bz2",
         }
         required.update(
-            f"./usr/local/{APP_ID}/lib/yuii_reader/{name}"
+            f"./usr/local/{APP_ID}/lib/shiye/{name}"
             for name in REQUIRED_BACKEND
         )
         missing = required - data_names
@@ -539,8 +539,8 @@ def build(platform: str, clean: bool) -> Path:
         package_root / "bin" / f"{APP_ID}-service",
     )
     shutil.copytree(
-        ROOT / "backend" / "yuii_reader",
-        package_root / "lib" / "yuii_reader",
+        ROOT / "backend" / "shiye",
+        package_root / "lib" / "shiye",
         ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
     )
 
@@ -631,7 +631,7 @@ def build(platform: str, clean: bool) -> Path:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Build the Yuii Reader TOS 7 package")
+    parser = argparse.ArgumentParser(description="Build the Shiye TOS 7 package")
     parser.add_argument(
         "--platform",
         choices=sorted(PLATFORM_ARCH),
