@@ -16,6 +16,12 @@ Yuii Reader 不是对某个项目的代码复刻，而是在产品形态和交�
 
 实现全部使用 Python 标准库和原生 HTML/CSS/JavaScript 重写，面向 TOS 7 的 iframe 应用规范，没有引入 Miniflux 或 FreshRSS 的源码。两者的许可证（Apache-2.0 / AGPL-3.0）仅作为设计参考，不构成代码授权关系。
 
+## 界面预览
+
+![Yuii Reader 三栏阅读界面（演示数据）](docs/screenshot.png)
+
+浅色主题下的三栏布局：左侧订阅与分类，中间文章列表，右侧正文阅读区。截图使用本地演示订阅，不含真实阅读数据。
+
 ## 功能
 
 ### 订阅与抓取
