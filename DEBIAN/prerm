@@ -1,0 +1,31 @@
+#!/bin/sh
+set -e
+
+APP_ID="yuii-reader"
+SYSTEM_ID="yuiireader-system"
+SOCKET_PATH="/var/api/${APP_ID}.sock"
+
+case "$1" in
+    remove|upgrade|deconfigure)
+        if [ -d /run/systemd/system ]; then
+            systemctl stop "${SYSTEM_ID}.service" 2>/dev/null || true
+
+            WAITED=0
+            while [ "${WAITED}" -lt 12 ] \
+                && systemctl is-active --quiet "${SYSTEM_ID}.service" 2>/dev/null; do
+                sleep 1
+                WAITED=$((WAITED + 1))
+            done
+
+            systemctl disable "${SYSTEM_ID}.service" 2>/dev/null || true
+        fi
+
+        # Only remove a socket, never a regular file that happens to use
+        # the same path. The service itself also cleans up on SIGTERM.
+        if [ -S "${SOCKET_PATH}" ]; then
+            rm -f "${SOCKET_PATH}" 2>/dev/null || true
+        fi
+        ;;
+esac
+
+exit 0

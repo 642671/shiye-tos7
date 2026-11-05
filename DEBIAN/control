@@ -1,0 +1,16 @@
+Package: yuii-reader
+Version: 0.1.0
+Architecture: amd64
+Maintainer: Yuii <yuii@localhost>
+Section: utils
+Priority: optional
+Depends: python3 (>= 3.10), systemd
+Description: RSS and Atom feed reader for TOS 7
+ Yuii Reader is a self-hosted feed reader that runs entirely on the NAS.
+ It supports RSS 2.0, RSS 1.0, Atom 1.0, OPML import and export, categories,
+ unread and starred states, full-text search, scheduled refresh with
+ conditional HTTP requests, and a keyboard-friendly three-pane interface.
+ .
+ Feeds are fetched over HTTP(S) by the application user. Article HTML is
+ sanitized on the server before it is stored, remote images are proxied,
+ and tracking parameters are removed from links.

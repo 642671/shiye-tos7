@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Yuii Reader">
+  <defs>
+    <linearGradient id="bg" x1="6" y1="4" x2="58" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3157d5"/>
+      <stop offset="1" stop-color="#6f4bf2"/>
+    </linearGradient>
+    <linearGradient id="page" x1="18" y1="18" x2="48" y2="50" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#e8edff"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="url(#bg)"/>
+  <path d="M14 18.5c5.5-2.8 11-2.8 17.5.5v29c-6.5-3.3-12-3.3-17.5-.5z" fill="url(#page)"/>
+  <path d="M50 18.5c-5.5-2.8-11-2.8-17.5.5v29c6.5-3.3 12-3.3 17.5-.5z" fill="url(#page)" opacity=".92"/>
+  <path d="M31.5 19v29" fill="none" stroke="#b9c6ef" stroke-width="1.4" stroke-linecap="round"/>
+  <path d="M33.5 15.5h6v13l-3-2.4-3 2.4z" fill="#ffb347"/>
+  <path d="M19 28.5c3-1.1 6-1.1 9-.1M19 34c3-1.1 6-1.1 9-.1M36 28.4c3-1 6-1 9 .1M36 33.9c3-1 6-1 9 .1" fill="none" stroke="#8d9fd6" stroke-width="1.5" stroke-linecap="round" opacity=".75"/>
+</svg>

@@ -1,0 +1,37 @@
+[Unit]
+Description=Yuii Reader WebUI service
+After=network.target
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+[Service]
+Type=simple
+User=yuii-reader
+WorkingDirectory=/usr/local/yuii-reader
+ExecStart=/usr/bin/python3 /usr/local/yuii-reader/bin/yuii-reader-service
+ExecStopPost=-/bin/rm -f /var/api/yuii-reader.sock
+EnvironmentFile=-/usr/local/yuii-reader/yuii-reader.env
+TimeoutStartSec=30
+TimeoutStopSec=10
+KillMode=control-group
+KillSignal=SIGTERM
+SendSIGKILL=yes
+
+# Keep only sandbox directives verified across the TOS 7.0 and 7.1 kernels.
+# Outbound HTTP(S) is required for feed fetching and is not restricted here.
+ProtectSystem=strict
+ProtectHome=true
+ProtectControlGroups=true
+
+# /var/api is a shared TOS directory and must stay writable for the
+# application-owned Unix socket. PrivateTmp is intentionally omitted.
+ReadWritePaths=/usr/local/yuii-reader/data /usr/local/yuii-reader/logs /var/api
+LimitNOFILE=65536
+LimitNPROC=256
+MemoryMax=512M
+CPUQuota=50%
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
