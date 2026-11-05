@@ -4,7 +4,7 @@
 
 它不依赖外部账号，不把订阅和阅读记录上传到第三方。作者与发布者：**Yuii**。
 
-- 当前版本：**0.2.0**
+- 当前版本：**0.2.1**
 - 许可证：**MIT**
 - 仓库：<https://github.com/642671/shiye-tos7>
 
@@ -65,7 +65,7 @@
 安装包由仓库中的 `build.py` 生成。以 x86_64 为例：
 
 ```bash
-sudo dpkg -i shiye_0.2.0_x86_64.deb
+sudo dpkg -i shiye_0.2.1_x86_64.deb
 ```
 
 安装脚本会：
@@ -83,6 +83,17 @@ curl --unix-socket /var/api/shiye.sock http://localhost/api/health
 ```
 
 健康检查返回的 JSON 中 `"app"` 必须是 `"shiye"`，只看到 HTTP 200 不足以说明服务正常。
+
+如果应用中心里提示连接失败，拾页会区分失败层级，并显示实际失败的请求地址：
+
+| 提示 | 含义 | 建议检查 |
+| --- | --- | --- |
+| 网络异常 | 浏览器没有收到任何响应 | 浏览器扩展、证书、网络连接 |
+| 会话失效 | TOS 会话没有生效 | 重新登录 TOS，从应用中心打开 |
+| 代理异常 | 平台代理没有转到拾页 | 应用是否已安装并启用，`config.ini` 的 `path` |
+| 服务离线 | 后端返回 5xx 或服务没有运行 | `systemctl status shiye-system` 和 `logs/postinst-diagnostic.txt` |
+
+健康检查同时支持 `/api/health` 和 `/health`；前者是后端 API 路径，后者便于平台或反代直接探测。
 
 > 卸载会删除 `/usr/local/shiye`（包括数据库）。卸载前请先在设置中导出 OPML。
 
@@ -132,8 +143,8 @@ python build.py --platform aarch64
 
 产物写入 `dist/`：
 
-- `shiye_0.2.0_x86_64.deb` / `.sha256`
-- `shiye_0.2.0_aarch64.deb` / `.sha256`
+- `shiye_0.2.1_x86_64.deb` / `.sha256`
+- `shiye_0.2.1_aarch64.deb` / `.sha256`
 
 构建固定文件属主、时间戳、归档条目顺序和压缩参数，同一工具链下可复现。不同 zlib 版本的压缩流可能产生不同字节，发布资产以对应 `.sha256` 为准。不要通过重命名 `.deb` 伪造架构。
 

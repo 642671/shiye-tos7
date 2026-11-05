@@ -262,16 +262,20 @@
     return Math.min(max, Math.max(min, Math.round(base + step)));
   }
 
-  function apiBaseCandidates(pathname) {
+  function healthCandidates(pathname) {
     var path = String(pathname === null || pathname === undefined ? "/" : pathname);
     if (!path) {
       path = "/";
     }
     var prefixes = ["/v2/proxy/shiye", "/proxy/shiye", "/shiye"];
-    var bases = [];
-    function add(base) {
-      if (base && bases.indexOf(base) === -1) {
-        bases.push(base);
+    var roots = [];
+    function addRoot(root) {
+      var value = String(root || "").replace(/\/+$/, "");
+      if (value === "/") {
+        value = "";
+      }
+      if (roots.indexOf(value) === -1) {
+        roots.push(value);
       }
     }
     var matched = "";
@@ -285,21 +289,32 @@
       }
     });
     if (matched) {
-      add(matched + "/api/");
-    } else {
-      var directory = path;
-      if (directory.charAt(directory.length - 1) !== "/") {
-        directory = directory.slice(0, directory.lastIndexOf("/") + 1);
-      }
-      if (!directory) {
-        directory = "/";
-      }
-      add(directory + "api/");
+      addRoot(matched);
     }
-    prefixes.forEach(function (prefix) {
-      add(prefix + "/api/");
+    prefixes.forEach(addRoot);
+    var directory = path;
+    if (directory.charAt(directory.length - 1) !== "/") {
+      directory = directory.slice(0, directory.lastIndexOf("/") + 1);
+    }
+    if (directory && directory !== "/") {
+      addRoot(directory);
+      addRoot(directory + "v2/proxy/shiye");
+    }
+    addRoot("");
+    var candidates = [];
+    function addCandidate(health, apiBase) {
+      for (var i = 0; i < candidates.length; i += 1) {
+        if (candidates[i].health === health) {
+          return;
+        }
+      }
+      candidates.push({ health: health, apiBase: apiBase });
+    }
+    roots.forEach(function (root) {
+      addCandidate(root + "/api/health", root + "/api/");
+      addCandidate(root + "/health", root + "/api/");
     });
-    return bases;
+    return candidates;
   }
 
   function debounce(fn, wait) {
@@ -331,7 +346,7 @@
     readingMeta: readingMeta,
     readingProgress: readingProgress,
     adjustFontSize: adjustFontSize,
-    apiBaseCandidates: apiBaseCandidates,
+    healthCandidates: healthCandidates,
     debounce: debounce,
   };
 });

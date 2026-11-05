@@ -83,13 +83,14 @@
 | 会话请求 | `credentials: "include"`，不手写 `Cookie` |
 | GET 请求 | 不设置 `Content-Type` |
 | 健康检查 | 校验 `health.app !== "shiye"`，不只看 200 |
-| 代理前缀 | 依次尝试 `/v2/proxy/shiye`、`/proxy/shiye`、`/shiye` |
+| 代理前缀 | 并发探测 `/v2/proxy/shiye`、`/proxy/shiye`、`/shiye`、页面目录和根路径的 `/api/health` 与 `/health`，取第一个成功项 |
+| 失败分类 | 区分网络异常、会话失效、代理异常、服务离线，并在失败页显示实际请求地址 |
 | 图片 URL | `fixMediaUrls` 把 `api/media?` 改写为当前 API 基地址 |
 
 ## 六、打包
 
-- `python build.py --platform x86_64` → `dist/shiye_0.2.0_x86_64.deb`
-- `python build.py --platform aarch64` → `dist/shiye_0.2.0_aarch64.deb`
+- `python build.py --platform x86_64` → `dist/shiye_0.2.1_x86_64.deb`
+- `python build.py --platform aarch64` → `dist/shiye_0.2.1_aarch64.deb`
 - 每个包附带 `.sha256`。
 - 固定 uid/gid 0、mtime `1704067200`、gzip mtime 0，构建可复现。
 - `verify_package` 会重新读取 ar 成员，检查 control 版本/架构、脚本可执行位、webui 必需文件、`__APP_VERSION__` 替换和 `?v=` 参数。
@@ -101,7 +102,7 @@
 
 ### 安装
 
-- [ ] `sudo dpkg -i shiye_0.2.0_<arch>.deb` 返回 0。
+- [ ] `sudo dpkg -i shiye_0.2.1_<arch>.deb` 返回 0。
 - [ ] `systemctl status shiye-system.service` 为 `active (running)`。
 - [ ] `ls -l /var/api/shiye.sock` 存在，所有者为 `shiye`。
 - [ ] `/var/api` 权限仍为平台默认（通常 `1777`），未被安装脚本修改。

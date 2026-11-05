@@ -201,6 +201,7 @@ class PackageContractTests(unittest.TestCase):
         html = (ROOT / "frontend" / "index.html").read_text(encoding="utf-8")
         script = (ROOT / "frontend" / "app.js").read_text(encoding="utf-8")
         theme = (ROOT / "frontend" / "theme.js").read_text(encoding="utf-8")
+        tools = (ROOT / "frontend" / "tools.js").read_text(encoding="utf-8")
         server = (ROOT / "backend" / "shiye" / "server.py").read_text(
             encoding="utf-8"
         )
@@ -336,8 +337,9 @@ class PackageContractTests(unittest.TestCase):
         self.assertIn('credentials: "include"', script)
         self.assertIn('cache: "no-store"', script)
         self.assertIn('health.app !== "shiye"', script)
-        self.assertIn('"/v2/proxy/shiye"', script)
-        self.assertIn('"/shiye"', script)
+        self.assertIn('"/v2/proxy/shiye"', tools)
+        self.assertIn('"/shiye"', tools)
+        self.assertIn("healthCandidates", tools)
         self.assertIn("fixMediaUrls", script)
         self.assertIn("media?url=", script)
         self.assertIn("localStorage", theme)

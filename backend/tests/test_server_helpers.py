@@ -161,6 +161,18 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertIn(b'id="app"', raw)
 
+    def test_bare_health_aliases(self) -> None:
+        for path in (
+            "/health",
+            "/shiye/health",
+            "/proxy/shiye/health",
+            "/v2/proxy/shiye/health",
+        ):
+            status, _, payload = self.harness.json("GET", path)
+            self.assertEqual(status, 200, path)
+            self.assertEqual(payload["app"], "shiye", path)
+            self.assertEqual(payload["version"], __version__, path)
+
     def test_normalize_path(self) -> None:
         self.assertEqual(normalize_path("/shiye/"), "/")
         self.assertEqual(normalize_path("/shiye/api/health/"), "/api/health")

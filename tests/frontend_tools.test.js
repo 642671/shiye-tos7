@@ -166,35 +166,36 @@ test("adjustFontSize clamps and rounds", () => {
   assert.equal(Tools.adjustFontSize(18.4, "x", 15, 24), 18);
 });
 
-test("apiBaseCandidates orders proxy prefixes", () => {
-  assert.deepEqual(Tools.apiBaseCandidates("/"), [
-    "/api/",
-    "/v2/proxy/shiye/api/",
-    "/proxy/shiye/api/",
-    "/shiye/api/",
-  ]);
-  assert.deepEqual(Tools.apiBaseCandidates("/v2/proxy/shiye/"), [
-    "/v2/proxy/shiye/api/",
-    "/proxy/shiye/api/",
-    "/shiye/api/",
-  ]);
-  assert.deepEqual(Tools.apiBaseCandidates("/proxy/shiye/index.html"), [
-    "/proxy/shiye/api/",
-    "/v2/proxy/shiye/api/",
-    "/shiye/api/",
-  ]);
-  assert.deepEqual(Tools.apiBaseCandidates("/custom/app/"), [
-    "/custom/app/api/",
-    "/v2/proxy/shiye/api/",
-    "/proxy/shiye/api/",
-    "/shiye/api/",
-  ]);
-  assert.deepEqual(Tools.apiBaseCandidates(""), [
-    "/api/",
-    "/v2/proxy/shiye/api/",
-    "/proxy/shiye/api/",
-    "/shiye/api/",
-  ]);
+test("healthCandidates finds the proxy route and its API base", () => {
+  function urls(pathname) {
+    return Tools.healthCandidates(pathname).map((item) => item.health);
+  }
+
+  const proxied = Tools.healthCandidates("/v2/proxy/shiye/index.html");
+  assert.equal(proxied[0].health, "/v2/proxy/shiye/api/health");
+  assert.equal(proxied[0].apiBase, "/v2/proxy/shiye/api/");
+  assert.equal(proxied[1].health, "/v2/proxy/shiye/health");
+  assert.equal(proxied[1].apiBase, "/v2/proxy/shiye/api/");
+
+  const direct = Tools.healthCandidates("/shiye/");
+  assert.equal(direct[0].health, "/shiye/api/health");
+  assert.equal(direct[0].apiBase, "/shiye/api/");
+
+  const custom = Tools.healthCandidates("/custom/app/index.html");
+  assert.equal(custom[0].health, "/v2/proxy/shiye/api/health");
+  assert.ok(custom.some((item) => item.health === "/custom/app/api/health"));
+  assert.ok(custom.some((item) => item.health === "/api/health"));
+  assert.ok(custom.some((item) => item.health === "/health"));
+
+  const all = urls("/v2/proxy/shiye/");
+  assert.equal(new Set(all).size, all.length);
+  assert.ok(all.includes("/api/health"));
+  assert.ok(all.includes("/v2/proxy/shiye/health"));
+
+  assert.deepEqual(Tools.healthCandidates("")[0], {
+    health: "/v2/proxy/shiye/api/health",
+    apiBase: "/v2/proxy/shiye/api/",
+  });
 });
 
 test("debounce coalesces calls", async () => {

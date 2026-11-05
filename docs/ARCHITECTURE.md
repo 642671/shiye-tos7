@@ -40,7 +40,7 @@ systemd: shiye-system.service
 
 | 方法 | 路径 | 作用 |
 | --- | --- | --- |
-| GET / HEAD | `/api/health` | 健康检查，含应用标识、版本、订阅/文章计数 |
+| GET / HEAD | `/api/health`、`/health` | 健康检查，含应用标识、版本、订阅/文章计数；带 TOS 前缀的路径同样可用 |
 | GET | `/api/feeds` | 列出订阅 |
 | POST | `/api/feeds` | 添加订阅（支持 URL 自动发现和分类） |
 | GET / PATCH / DELETE | `/api/feeds/{id}` | 查看、修改、删除订阅 |
@@ -61,7 +61,7 @@ systemd: shiye-system.service
 | GET / POST | `/api/opml` | 导出 / 导入 OPML |
 | GET | `/api/media?url=...` | 图片代理 |
 
-`/api/health` 的响应正文包含 `"app": "shiye"`。前端和运维脚本都必须校验这个字段。
+`/api/health` 和 `/health` 的响应正文包含 `"app": "shiye"`。前端和运维脚本都必须校验这个字段。前端会并发探测平台可能使用的多种代理前缀，以第一个返回正确应用标识的地址作为 API 基地址；连接失败时按网络、会话、代理、服务四层分类并显示失败地址。
 
 ## 数据模型
 

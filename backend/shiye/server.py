@@ -146,10 +146,7 @@ class AppHandler(BaseHTTPRequestHandler):
         path = normalize_path(parsed.path)
         query = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
 
-        if method == "GET" and path == "/api/health":
-            self._send_json(HTTPStatus.OK, self.service.health())
-            return
-        if method == "HEAD" and path == "/api/health":
+        if method in {"GET", "HEAD"} and path in {"/api/health", "/health"}:
             self._send_json(HTTPStatus.OK, self.service.health())
             return
 

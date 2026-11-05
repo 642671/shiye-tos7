@@ -63,19 +63,55 @@
     if (status === 401 || status === 403) {
       return "session";
     }
-    if (status === 502 || status === 503 || status === 504) {
-      return "gateway";
+    if (status >= 500) {
+      return "offline";
     }
     return "rejected";
   }
 
+  var CONNECTION_LABELS = {
+    network: "网络异常",
+    session: "会话失效",
+    gateway: "代理异常",
+    offline: "服务离线",
+    rejected: "连接异常",
+  };
+
+  var CONNECTION_COPY = {
+    network: {
+      title: "无法连接平台代理",
+      hint:
+        "浏览器没有收到任何响应。请检查浏览器扩展拦截、证书或网络连接，" +
+        "并确认下面这个地址能否直接打开；在本机调试时也请确认服务已经启动。",
+    },
+    session: {
+      title: "TOS 会话没有生效",
+      hint: "请重新登录 TOS，再从应用中心打开拾页。",
+    },
+    gateway: {
+      title: "平台代理没有转到拾页",
+      hint: "请确认拾页已在应用中心安装并启用。下面是实际失败的请求地址。",
+    },
+    offline: {
+      title: "拾页服务没有运行",
+      hint:
+        "请在 TOS 终端执行 systemctl status shiye-system，" +
+        "并查看 /usr/local/shiye/logs/postinst-diagnostic.txt。",
+    },
+    rejected: {
+      title: "请求被拒绝",
+      hint: "服务返回了意料之外的响应，请确认应用版本与安装是否完整。",
+    },
+  };
+
   class AppError extends Error {
-    constructor(message, code, kind, status) {
+    constructor(message, code, kind, status, url) {
       super(message);
       this.name = "AppError";
       this.code = code || "error";
       this.kind = kind || "error";
       this.status = status || 0;
+      this.url = url || "";
     }
   }
 
@@ -101,20 +137,19 @@
     }
   }
 
-  var API_PREFIXES = ["/v2/proxy/shiye", "/proxy/shiye", "/shiye"];
-  var API_BASES =
-    Tools && typeof Tools.apiBaseCandidates === "function"
-      ? Tools.apiBaseCandidates(window.location.pathname || "/")
-      : ["/api/"].concat(
-          API_PREFIXES.map(function (prefix) {
-            return prefix + "/api/";
-          })
-        );
+  var HEALTH_CANDIDATES =
+    Tools && typeof Tools.healthCandidates === "function"
+      ? Tools.healthCandidates(window.location.pathname || "/")
+      : [{ health: "/api/health", apiBase: "/api/" }];
 
   var Api = {
-    base: API_BASES[0],
+    base: HEALTH_CANDIDATES[0].apiBase,
     url: function (path) {
-      return this.base + String(path || "").replace(/^\/+/, "");
+      var value = String(path || "");
+      if (value.charAt(0) === "/") {
+        return value;
+      }
+      return this.base + value.replace(/^\/+/, "");
     },
     request: async function (path, options) {
       options = options || {};
@@ -149,20 +184,32 @@
           controller.abort();
         }, options.timeout || 20000);
       }
+      var requestUrl = this.url(path);
       var response;
       try {
-        response = await fetch(this.url(path), init);
+        response = await fetch(requestUrl, init);
       } catch (error) {
         if (timedOut) {
-          setConnection("error", "请求超时");
-          throw new AppError("请求超时，请稍后重试。", "timeout", "network", 0);
+          if (!options.silent) {
+            setConnection("error", "请求超时");
+          }
+          throw new AppError(
+            "请求超时，请稍后重试。",
+            "timeout",
+            "network",
+            0,
+            requestUrl
+          );
         }
-        setConnection("error", "服务离线");
+        if (!options.silent) {
+          setConnection("error", CONNECTION_LABELS.network);
+        }
         throw new AppError(
-          "无法连接拾页服务，请确认应用正在运行。",
+          "浏览器没有收到响应，请检查网络、证书或浏览器扩展。",
           "offline",
-          "offline",
-          0
+          "network",
+          0,
+          requestUrl
         );
       } finally {
         if (timer) {
@@ -187,38 +234,68 @@
         }
       }
 
+      if (
+        parsed &&
+        data &&
+        (data.is_login === false || data.code_num === 117)
+      ) {
+        if (!options.silent) {
+          setConnection("error", CONNECTION_LABELS.session);
+        }
+        throw new AppError(
+          "TOS 会话没有生效，请重新登录后从应用中心打开。",
+          "session_expired",
+          "session",
+          response.status,
+          requestUrl
+        );
+      }
+
       if (!response.ok) {
         var kind = errorKind(response.status);
         var message =
           (data && (data.error || data.message)) ||
           defaultStatusMessage(response.status);
-        if (kind === "session") {
-          setConnection("error", "会话失效");
-        } else if (kind === "gateway") {
-          setConnection("error", "服务异常");
+        if (!options.silent) {
+          setConnection(
+            "error",
+            kind === "session"
+              ? "会话失效"
+              : kind === "offline"
+                ? "服务离线"
+                : "请求失败"
+          );
         }
         throw new AppError(
           message,
           (data && data.code) || "http_" + response.status,
           kind,
-          response.status
+          response.status,
+          requestUrl
         );
       }
 
       if (response.status === 204 || !text) {
-        setConnection("ok", "已连接");
+        if (!options.silent) {
+          setConnection("ok", "已连接");
+        }
         return null;
       }
       if (!parsed) {
-        setConnection("error", "响应异常");
+        if (!options.silent) {
+          setConnection("error", CONNECTION_LABELS.gateway);
+        }
         throw new AppError(
-          "服务返回了无法识别的响应，请确认应用已正确安装。",
+          "平台返回了无法识别的响应，请确认应用已正确安装。",
           "invalid_response",
           "gateway",
-          response.status
+          response.status,
+          requestUrl
         );
       }
-      setConnection("ok", "已连接");
+      if (!options.silent) {
+        setConnection("ok", "已连接");
+      }
       return data;
     },
     get: function (path, options) {
@@ -2529,25 +2606,51 @@
   }
 
   async function discoverApiBase() {
-    var lastError = null;
-    for (var i = 0; i < API_BASES.length; i += 1) {
-      Api.base = API_BASES[i];
-      try {
-        return checkHealth(await Api.get("health", { timeout: 7000 }));
-      } catch (error) {
-        lastError = error;
-        if (
-          error &&
-          (error.kind === "offline" ||
-            error.kind === "network" ||
-            error.kind === "session")
-        ) {
-          throw error;
-        }
+    var probes = HEALTH_CANDIDATES.map(function (candidate) {
+      return Api.get(candidate.health, { timeout: 4000, silent: true })
+        .then(function (health) {
+          return { candidate: candidate, health: checkHealth(health) };
+        })
+        .catch(function (error) {
+          if (error && !error.url) {
+            error.url = candidate.health;
+          }
+          return { candidate: candidate, error: error };
+        });
+    });
+    var results = await Promise.all(probes);
+    var sessionError = null;
+    var firstError = null;
+    for (var i = 0; i < results.length; i += 1) {
+      var result = results[i];
+      if (result.health) {
+        Api.base = result.candidate.apiBase;
+        return result.health;
+      }
+      var error = result.error;
+      if (error && error.kind === "session" && !sessionError) {
+        sessionError = error;
+      }
+      if (!firstError) {
+        firstError = error;
       }
     }
+    if (sessionError) {
+      throw sessionError;
+    }
+    if (firstError && firstError.kind === "rejected") {
+      throw new AppError(
+        "所有候选地址都没有返回拾页服务（HTTP " +
+          firstError.status +
+          "）。请确认应用已在应用中心注册并启用。",
+        "gateway",
+        "gateway",
+        firstError.status,
+        firstError.url
+      );
+    }
     throw (
-      lastError ||
+      firstError ||
       new AppError(
         "无法连接拾页服务，请确认应用正在运行。",
         "offline",
@@ -2588,21 +2691,35 @@
       state.booted = false;
       setConnection(
         "error",
-        error && error.kind === "gateway" ? "服务异常" : "服务离线"
+        CONNECTION_LABELS[(error && error.kind) || ""] || "服务离线"
       );
       showBootFailure(error);
     }
   }
 
   function showBootFailure(error) {
-    var message = errorMessage(error);
+    var kind = (error && error.kind) || "offline";
+    var copy = CONNECTION_COPY[kind] || CONNECTION_COPY.offline;
+    var label = CONNECTION_LABELS[kind] || "服务离线";
+    var message = copy.hint;
+    if (
+      error &&
+      error.message &&
+      error.message !== copy.hint &&
+      (kind === "offline" || kind === "rejected")
+    ) {
+      message += " " + error.message;
+    }
+    if (error && error.url) {
+      message += " 失败的地址：" + error.url;
+    }
     ui.listTitle.textContent = "全部文章";
-    ui.listMeta.textContent = "服务未连接";
+    ui.listMeta.textContent = label;
     ui.articleList.replaceChildren();
     ui.listEmpty.hidden = false;
-    ui.listEmptyTitle.textContent = "无法连接服务";
+    ui.listEmptyTitle.textContent = copy.title;
     ui.listEmptyText.textContent = message;
-    ui.listEmptyAction.textContent = "重新连接";
+    ui.listEmptyAction.textContent = "重新检测";
     ui.listEmptyAction.onclick = function () {
       boot();
     };
@@ -2610,11 +2727,11 @@
     ui.loadMoreButton.hidden = true;
     ui.listFooterText.textContent = "未连接";
     ui.markAllButton.disabled = true;
-    showListError(message);
+    showListError(copy.title + "：" + message);
     state.retryHandler = boot;
     renderSidebar();
     updateFooter();
-    ui.statusText.textContent = "服务未连接";
+    ui.statusText.textContent = copy.title;
     ui.footerStats.textContent = "";
   }
 

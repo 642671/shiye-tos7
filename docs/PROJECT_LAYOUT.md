@@ -2,7 +2,7 @@
 
 ```text
 shiye-tos7/
-├─ VERSION                          当前版本号（0.2.0）
+├─ VERSION                          当前版本号（0.2.1）
 ├─ config.ini                       TOS 应用元数据（JSON）
 ├─ shiye.lang                       14 种语言的商店文案
 ├─ shiye.env                        systemd 环境变量
