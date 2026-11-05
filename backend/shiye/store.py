@@ -11,7 +11,10 @@ from typing import Any, Iterable
 from .sanitize import html_to_text
 from .util import clamp_int, iso_before, like_pattern, utc_now
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+
+SAVED_FEED_URL = "shiye:saved"
+SAVED_FEED_TITLE = "稍后读"
 
 DEFAULT_SETTINGS: dict[str, Any] = {
     "refresh_interval": 30,
@@ -36,6 +39,7 @@ CREATE TABLE IF NOT EXISTS feeds (
     site_url TEXT NOT NULL DEFAULT '',
     description TEXT NOT NULL DEFAULT '',
     icon_url TEXT NOT NULL DEFAULT '',
+    kind TEXT NOT NULL DEFAULT 'rss',
     etag TEXT NOT NULL DEFAULT '',
     last_modified TEXT NOT NULL DEFAULT '',
     last_fetch_at TEXT,
@@ -60,6 +64,9 @@ CREATE TABLE IF NOT EXISTS articles (
     author TEXT NOT NULL DEFAULT '',
     summary TEXT NOT NULL DEFAULT '',
     content TEXT NOT NULL DEFAULT '',
+    site_name TEXT NOT NULL DEFAULT '',
+    word_count INTEGER NOT NULL DEFAULT 0,
+    reading_minutes INTEGER NOT NULL DEFAULT 0,
     published_at TEXT NOT NULL,
     fetched_at TEXT NOT NULL,
     is_read INTEGER NOT NULL DEFAULT 0,
@@ -112,8 +119,33 @@ class Store:
             version = self._connection.execute("PRAGMA user_version").fetchone()[0]
             if version < 1:
                 self._connection.executescript(_SCHEMA)
-                self._connection.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
-                self._connection.commit()
+                version = 1
+            if version < 2:
+                self._ensure_column("feeds", "kind", "TEXT NOT NULL DEFAULT 'rss'")
+                self._ensure_column(
+                    "articles", "site_name", "TEXT NOT NULL DEFAULT ''"
+                )
+                self._ensure_column(
+                    "articles", "word_count", "INTEGER NOT NULL DEFAULT 0"
+                )
+                self._ensure_column(
+                    "articles", "reading_minutes", "INTEGER NOT NULL DEFAULT 0"
+                )
+            if version != SCHEMA_VERSION:
+                self._connection.execute(
+                    f"PRAGMA user_version={SCHEMA_VERSION}"
+                )
+            self._connection.commit()
+
+    def _ensure_column(self, table: str, name: str, definition: str) -> None:
+        columns = {
+            row["name"]
+            for row in self._connection.execute(f"PRAGMA table_info({table})")
+        }
+        if name not in columns:
+            self._connection.execute(
+                f"ALTER TABLE {table} ADD COLUMN {name} {definition}"
+            )
 
     def close(self) -> None:
         with self._lock:
@@ -198,7 +230,7 @@ class Store:
 
     _FEED_SELECT = """
         SELECT f.id, f.category_id, f.title, f.url, f.site_url, f.description,
-               f.icon_url, f.etag, f.last_modified, f.last_fetch_at,
+               f.icon_url, f.kind, f.etag, f.last_modified, f.last_fetch_at,
                f.last_success_at, f.next_fetch_at, f.error_count, f.last_error,
                f.disabled, f.created_at, f.updated_at,
                c.name AS category_name,
@@ -210,9 +242,11 @@ class Store:
           LEFT JOIN categories c ON c.id = f.category_id
     """
 
-    def list_feeds(self) -> list[dict[str, Any]]:
+    def list_feeds(self, *, include_saved: bool = False) -> list[dict[str, Any]]:
+        where = "" if include_saved else " WHERE f.kind != 'saved'"
         return self._query(
             self._FEED_SELECT
+            + where
             + """
              ORDER BY c.position ASC, c.name COLLATE NOCASE ASC,
                       f.title COLLATE NOCASE ASC, f.id ASC
@@ -234,6 +268,7 @@ class Store:
         description: str = "",
         icon_url: str = "",
         category_id: int | None = None,
+        kind: str = "rss",
     ) -> dict[str, Any]:
         now = utc_now()
         try:
@@ -241,8 +276,8 @@ class Store:
                 """
                 INSERT INTO feeds (
                     category_id, title, url, site_url, description, icon_url,
-                    next_fetch_at, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    kind, next_fetch_at, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     category_id,
@@ -251,6 +286,7 @@ class Store:
                     site_url,
                     description,
                     icon_url,
+                    "saved" if kind == "saved" else "rss",
                     now,
                     now,
                     now,
@@ -259,6 +295,52 @@ class Store:
         except sqlite3.IntegrityError as exc:
             raise StoreError("该订阅地址已存在", "duplicate_feed") from exc
         return self.get_feed(int(cursor.lastrowid)) or {}
+
+    def ensure_saved_feed(self) -> dict[str, Any]:
+        """Create the hidden feed that holds saved links, idempotently."""
+
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT id FROM feeds WHERE url = ?", (SAVED_FEED_URL,)
+            ).fetchone()
+            if row:
+                saved_id = int(row["id"])
+                self._connection.execute(
+                    """
+                    UPDATE feeds
+                       SET kind = 'saved', disabled = 1, next_fetch_at = NULL,
+                           title = CASE WHEN title = '' THEN ? ELSE title END,
+                           updated_at = ?
+                     WHERE id = ?
+                    """,
+                    (SAVED_FEED_TITLE, utc_now(), saved_id),
+                )
+                self._connection.commit()
+                return self.get_feed(saved_id) or {}
+            now = utc_now()
+            cursor = self._connection.execute(
+                """
+                INSERT INTO feeds (
+                    category_id, title, url, site_url, description, icon_url,
+                    kind, next_fetch_at, disabled, created_at, updated_at
+                ) VALUES (NULL, ?, ?, '', ?, '', 'saved', NULL, 1, ?, ?)
+                """,
+                (
+                    SAVED_FEED_TITLE,
+                    SAVED_FEED_URL,
+                    "保存下来稍后阅读的文章",
+                    now,
+                    now,
+                ),
+            )
+            self._connection.commit()
+            return self.get_feed(int(cursor.lastrowid)) or {}
+
+    def saved_feed_id(self) -> int | None:
+        row = self._query_one(
+            "SELECT id FROM feeds WHERE kind = 'saved' ORDER BY id ASC LIMIT 1"
+        )
+        return int(row["id"]) if row else None
 
     def update_feed_meta(
         self,
@@ -359,6 +441,7 @@ class Store:
             self._FEED_SELECT
             + """
              WHERE f.disabled = 0
+               AND f.kind != 'saved'
                AND (f.next_fetch_at IS NULL OR f.next_fetch_at <= ?)
              ORDER BY COALESCE(f.next_fetch_at, '') ASC, f.id ASC
             """,
@@ -366,7 +449,9 @@ class Store:
         )
 
     def count_feeds(self) -> int:
-        row = self._query_one("SELECT COUNT(*) AS total FROM feeds")
+        row = self._query_one(
+            "SELECT COUNT(*) AS total FROM feeds WHERE kind != 'saved'"
+        )
         return int(row["total"]) if row else 0
 
     # -------------------------------------------------------------------- articles
@@ -398,6 +483,9 @@ class Store:
                 summary = str(entry.get("summary") or "")
                 content = str(entry.get("content") or "")
                 author = str(entry.get("author") or "")[:200]
+                site_name = str(entry.get("site_name") or "")[:200]
+                word_count = max(0, int(entry.get("word_count") or 0))
+                reading_minutes = max(0, int(entry.get("reading_minutes") or 0))
                 published = str(entry.get("published_at") or fetched_at)
                 url = str(entry.get("url") or "")[:2048]
                 search_text = self._search_text(title, author, summary, content)
@@ -405,8 +493,9 @@ class Store:
                     """
                     INSERT INTO articles (
                         feed_id, guid, url, title, author, summary, content,
+                        site_name, word_count, reading_minutes,
                         published_at, fetched_at, search_text
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(feed_id, guid) DO NOTHING
                     """,
                     (
@@ -417,6 +506,9 @@ class Store:
                         author,
                         summary,
                         content,
+                        site_name,
+                        word_count,
+                        reading_minutes,
                         published,
                         fetched_at,
                         search_text,
@@ -429,7 +521,8 @@ class Store:
                     """
                     UPDATE articles
                        SET url = ?, title = ?, author = ?, summary = ?,
-                           content = ?, published_at = ?, search_text = ?
+                           content = ?, site_name = ?, word_count = ?,
+                           reading_minutes = ?, published_at = ?, search_text = ?
                      WHERE feed_id = ? AND guid = ?
                     """,
                     (
@@ -438,6 +531,9 @@ class Store:
                         author,
                         summary,
                         content,
+                        site_name,
+                        word_count,
+                        reading_minutes,
                         published,
                         search_text,
                         feed_id,
@@ -454,6 +550,7 @@ class Store:
         category_id: int | None,
         unread_only: bool,
         starred_only: bool,
+        saved_only: bool,
         search: str,
         since: str | None,
     ) -> tuple[str, list[Any]]:
@@ -465,6 +562,8 @@ class Store:
         elif category_id is not None:
             clauses.append("a.feed_id IN (SELECT id FROM feeds WHERE category_id = ?)")
             params.append(category_id)
+        if saved_only:
+            clauses.append("f.kind = 'saved'")
         if unread_only:
             clauses.append("a.is_read = 0")
         if starred_only:
@@ -484,6 +583,7 @@ class Store:
         category_id: int | None = None,
         unread_only: bool = False,
         starred_only: bool = False,
+        saved_only: bool = False,
         search: str = "",
         since: str | None = None,
         limit: int = 30,
@@ -494,17 +594,25 @@ class Store:
             category_id=category_id,
             unread_only=unread_only,
             starred_only=starred_only,
+            saved_only=saved_only,
             search=search,
             since=since,
         )
         total_row = self._query_one(
-            f"SELECT COUNT(*) AS total FROM articles a WHERE {where}", params
+            f"""
+            SELECT COUNT(*) AS total
+              FROM articles a
+              JOIN feeds f ON f.id = a.feed_id
+             WHERE {where}
+            """,
+            params,
         )
         rows = self._query(
             f"""
             SELECT a.id, a.feed_id, f.title AS feed_title, f.icon_url AS feed_icon,
-                   a.title, a.author, a.summary, a.url, a.published_at,
-                   a.fetched_at, a.is_read, a.is_starred
+                   f.kind AS feed_kind, a.title, a.author, a.summary, a.url,
+                   a.site_name, a.word_count, a.reading_minutes,
+                   a.published_at, a.fetched_at, a.is_read, a.is_starred
               FROM articles a
               JOIN feeds f ON f.id = a.feed_id
              WHERE {where}
@@ -527,9 +635,10 @@ class Store:
         row = self._query_one(
             """
             SELECT a.id, a.feed_id, f.title AS feed_title, f.icon_url AS feed_icon,
-                   f.site_url AS feed_site_url, a.title, a.author, a.summary,
-                   a.content, a.url, a.published_at, a.fetched_at,
-                   a.is_read, a.is_starred
+                   f.site_url AS feed_site_url, f.kind AS feed_kind,
+                   a.title, a.author, a.summary, a.content, a.url,
+                   a.site_name, a.word_count, a.reading_minutes,
+                   a.published_at, a.fetched_at, a.is_read, a.is_starred
               FROM articles a
               JOIN feeds f ON f.id = a.feed_id
              WHERE a.id = ?
@@ -540,6 +649,58 @@ class Store:
             row["is_read"] = bool(row["is_read"])
             row["is_starred"] = bool(row["is_starred"])
         return row
+
+    def find_saved_article(self, url: str) -> dict[str, Any] | None:
+        row = self._query_one(
+            """
+            SELECT a.id
+              FROM articles a
+              JOIN feeds f ON f.id = a.feed_id
+             WHERE f.kind = 'saved' AND a.url = ?
+             ORDER BY a.id DESC
+             LIMIT 1
+            """,
+            (url,),
+        )
+        return self.get_article(int(row["id"])) if row else None
+
+    def delete_article(self, article_id: int) -> bool:
+        cursor = self._execute("DELETE FROM articles WHERE id = ?", (article_id,))
+        return cursor.rowcount > 0
+
+    def update_article_content(
+        self,
+        article_id: int,
+        *,
+        title: str,
+        author: str,
+        summary: str,
+        content: str,
+        site_name: str,
+        word_count: int,
+        reading_minutes: int,
+    ) -> None:
+        search_text = self._search_text(title, author, summary, content)
+        self._execute(
+            """
+            UPDATE articles
+               SET title = ?, author = ?, summary = ?, content = ?,
+                   site_name = ?, word_count = ?, reading_minutes = ?,
+                   search_text = ?
+             WHERE id = ?
+            """,
+            (
+                title,
+                author,
+                summary,
+                content,
+                site_name,
+                max(0, word_count),
+                max(0, reading_minutes),
+                search_text,
+                article_id,
+            ),
+        )
 
     def mark_read(self, article_ids: list[int], read: bool = True) -> int:
         if not article_ids:
@@ -564,7 +725,11 @@ class Store:
         return article
 
     def mark_all_read(
-        self, *, feed_id: int | None = None, category_id: int | None = None
+        self,
+        *,
+        feed_id: int | None = None,
+        category_id: int | None = None,
+        saved_only: bool = False,
     ) -> int:
         clauses = ["is_read = 0"]
         params: list[Any] = []
@@ -574,6 +739,8 @@ class Store:
         elif category_id is not None:
             clauses.append("feed_id IN (SELECT id FROM feeds WHERE category_id = ?)")
             params.append(category_id)
+        elif saved_only:
+            clauses.append("feed_id IN (SELECT id FROM feeds WHERE kind = 'saved')")
         cursor = self._execute(
             f"UPDATE articles SET is_read = 1 WHERE {' AND '.join(clauses)}", params
         )
@@ -587,13 +754,17 @@ class Store:
                 """
                 DELETE FROM articles
                  WHERE is_read = 1 AND is_starred = 0 AND published_at < ?
+                   AND feed_id IN (SELECT id FROM feeds WHERE kind != 'saved')
                 """,
                 (cutoff,),
             )
             deleted += max(0, cursor.rowcount)
         if max_per_feed > 0:
             feed_ids = [
-                row["id"] for row in self._query("SELECT id FROM feeds")
+                row["id"]
+                for row in self._query(
+                    "SELECT id FROM feeds WHERE kind != 'saved'"
+                )
             ]
             for feed_id in feed_ids:
                 cursor = self._execute(
@@ -665,11 +836,21 @@ class Store:
     # ------------------------------------------------------------------------ stats
 
     def stats(self) -> dict[str, Any]:
-        feeds = self._query_one("SELECT COUNT(*) AS total FROM feeds")["total"]
+        feeds = self._query_one(
+            "SELECT COUNT(*) AS total FROM feeds WHERE kind != 'saved'"
+        )["total"]
         categories = self._query_one(
             "SELECT COUNT(*) AS total FROM categories"
         )["total"]
         articles = self._query_one("SELECT COUNT(*) AS total FROM articles")["total"]
+        saved = self._query_one(
+            """
+            SELECT COUNT(*) AS total
+              FROM articles a
+              JOIN feeds f ON f.id = a.feed_id
+             WHERE f.kind = 'saved'
+            """
+        )["total"]
         unread = self._query_one(
             "SELECT COUNT(*) AS total FROM articles WHERE is_read = 0"
         )["total"]
@@ -677,7 +858,7 @@ class Store:
             "SELECT COUNT(*) AS total FROM articles WHERE is_starred = 1"
         )["total"]
         last_refresh = self._query_one(
-            "SELECT MAX(last_fetch_at) AS last FROM feeds"
+            "SELECT MAX(last_fetch_at) AS last FROM feeds WHERE kind != 'saved'"
         )["last"]
         try:
             size = os.path.getsize(self.path)
@@ -690,6 +871,7 @@ class Store:
             "feeds": int(feeds),
             "categories": int(categories),
             "articles": int(articles),
+            "saved": int(saved),
             "unread": int(unread),
             "starred": int(starred),
             "last_refresh_at": last_refresh,

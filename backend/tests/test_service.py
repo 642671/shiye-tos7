@@ -367,5 +367,119 @@ class ManagementTests(ServiceTestCase):
         self.assertEqual(caught.exception.code, "invalid_url")
 
 
+class SavedArticleTests(ServiceTestCase):
+    PAGE = """
+    <html><head>
+      <title>稍后读测试文章 - 示例站</title>
+      <meta property="og:site_name" content="示例站">
+      <meta name="author" content="作者甲">
+      <meta property="og:description" content="稍后读摘要">
+    </head><body>
+      <article>
+        <p>这是一段足够长的正文，用于验证保存链接时能够提取出干净的阅读内容，并且去掉导航和广告。</p>
+        <p>第二段继续补充内容，确保阅读时间与字数统计都有实际意义，而不是空值。</p>
+        <p>第三段用来让正文长度稳稳超过阈值，减少测试对具体字数的敏感程度。</p>
+      </article>
+    </body></html>
+    """
+
+    def page_result(self, url: str = "https://example.com/story") -> FetchResult:
+        return FetchResult(
+            url=url,
+            final_url=url,
+            status=200,
+            body=self.PAGE.encode("utf-8"),
+            content_type="text/html",
+            charset="utf-8",
+        )
+
+    def test_save_extracts_content_and_hides_internal_feed(self) -> None:
+        with mock.patch(
+            "shiye.service.fetch_page", return_value=(self.page_result(), self.PAGE)
+        ):
+            result = self.service.save_article("example.com/story")
+        article = result["article"]
+        self.assertTrue(result["created"])
+        self.assertTrue(result["extracted"])
+        self.assertEqual(article["title"], "稍后读测试文章")
+        self.assertEqual(article["site_name"], "示例站")
+        self.assertEqual(article["author"], "作者甲")
+        self.assertIn("一段足够长的正文", article["content"])
+        self.assertGreater(article["word_count"], 20)
+        self.assertGreaterEqual(article["reading_minutes"], 1)
+        self.assertEqual(self.service.list_feeds(), [])
+        saved = self.service.list_articles(saved_only=True)
+        self.assertEqual(saved["total"], 1)
+        self.assertEqual(saved["items"][0]["feed_kind"], "saved")
+        self.assertEqual(self.service.stats()["saved"], 1)
+        self.assertEqual(self.service.health()["saved"], 1)
+
+    def test_save_twice_reuses_existing_article(self) -> None:
+        with mock.patch(
+            "shiye.service.fetch_page", return_value=(self.page_result(), self.PAGE)
+        ):
+            first = self.service.save_article("https://example.com/story")
+            second = self.service.save_article("https://example.com/story")
+        self.assertTrue(first["created"])
+        self.assertFalse(second["created"])
+        self.assertEqual(first["article"]["id"], second["article"]["id"])
+        self.assertEqual(self.service.stats()["saved"], 1)
+
+    def test_fallback_saves_link_without_fetching(self) -> None:
+        with mock.patch("shiye.service.fetch_page") as fetch:
+            result = self.service.save_article(
+                "https://example.com/later", fallback=True, title="稍后看的文章"
+            )
+            fetch.assert_not_called()
+        article = result["article"]
+        self.assertFalse(result["extracted"])
+        self.assertEqual(article["title"], "稍后看的文章")
+        self.assertEqual(article["content"], "")
+        self.assertEqual(article["site_name"], "example.com")
+
+    def test_reload_extracts_content_for_fallback_article(self) -> None:
+        fallback = self.service.save_article(
+            "https://example.com/story", fallback=True
+        )
+        article_id = int(fallback["article"]["id"])
+        with mock.patch(
+            "shiye.service.fetch_page", return_value=(self.page_result(), self.PAGE)
+        ):
+            article = self.service.reload_saved_content(article_id)
+        self.assertIn("一段足够长的正文", article["content"])
+        self.assertGreater(article["word_count"], 0)
+
+    def test_extract_failure_maps_to_422(self) -> None:
+        with mock.patch(
+            "shiye.service.fetch_page",
+            side_effect=FeedError("页面打不开", "network_error"),
+        ):
+            with self.assertRaises(ServiceError) as caught:
+                self.service.save_article("https://example.com/broken")
+        self.assertEqual(caught.exception.status, 422)
+        self.assertEqual(caught.exception.code, "network_error")
+
+    def test_only_saved_articles_can_be_deleted(self) -> None:
+        self.subscribe()
+        regular_id = int(self.service.list_articles()["items"][0]["id"])
+        with self.assertRaises(ServiceError) as caught:
+            self.service.delete_article(regular_id)
+        self.assertEqual(caught.exception.code, "not_saved")
+        saved = self.service.save_article(
+            "https://example.com/later", fallback=True
+        )
+        result = self.service.delete_article(int(saved["article"]["id"]))
+        self.assertTrue(result["deleted"])
+        self.assertEqual(self.service.stats()["saved"], 0)
+
+    def test_saved_feed_cannot_be_refreshed_or_deleted(self) -> None:
+        feed_id = self.service.store.saved_feed_id()
+        self.assertIsNotNone(feed_id)
+        with self.assertRaises(ServiceError):
+            self.service.refresh_feed(int(feed_id))
+        with self.assertRaises(ServiceError):
+            self.service.delete_feed(int(feed_id))
+
+
 if __name__ == "__main__":
     unittest.main()

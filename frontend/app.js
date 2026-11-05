@@ -42,7 +42,7 @@
       return "会话已失效，请刷新页面重新登录。";
     }
     if (status === 404) {
-      return "请求的内容不存在。";
+      return "没有找到这项内容，可能已经被移除。";
     }
     if (status === 409) {
       return "操作与当前状态冲突。";
@@ -86,27 +86,33 @@
     return "操作失败，请稍后重试。";
   }
 
-  function detectApiBase() {
-    var path = window.location.pathname || "/";
-    var prefixes = ["/v2/proxy/shiye", "/proxy/shiye", "/shiye"];
-    for (var i = 0; i < prefixes.length; i += 1) {
-      var prefix = prefixes[i];
-      if (path === prefix || path === prefix + "/" || path.indexOf(prefix + "/") === 0) {
-        return prefix + "/api/";
-      }
+  function siteLabel(article) {
+    var site = String((article && article.site_name) || "").trim();
+    if (site) {
+      return site;
     }
-    var directory = path;
-    if (directory.charAt(directory.length - 1) !== "/") {
-      directory = directory.slice(0, directory.lastIndexOf("/") + 1);
+    try {
+      return new URL(article.url, window.location.href).hostname.replace(
+        /^www\./,
+        ""
+      );
+    } catch (error) {
+      return "";
     }
-    if (!directory) {
-      directory = "/";
-    }
-    return directory + "api/";
   }
 
+  var API_PREFIXES = ["/v2/proxy/shiye", "/proxy/shiye", "/shiye"];
+  var API_BASES =
+    Tools && typeof Tools.apiBaseCandidates === "function"
+      ? Tools.apiBaseCandidates(window.location.pathname || "/")
+      : ["/api/"].concat(
+          API_PREFIXES.map(function (prefix) {
+            return prefix + "/api/";
+          })
+        );
+
   var Api = {
-    base: detectApiBase(),
+    base: API_BASES[0],
     url: function (path) {
       return this.base + String(path || "").replace(/^\/+/, "");
     },
@@ -248,6 +254,8 @@
     searchClear: $("searchClear"),
     connectionPill: $("connectionPill"),
     connectionText: $("connectionText"),
+    saveLinkButton: $("saveLinkButton"),
+    sidebarSaveLink: $("sidebarSaveLink"),
     refreshButton: $("refreshButton"),
     themeToggle: $("themeToggle"),
     settingsButton: $("settingsButton"),
@@ -268,22 +276,42 @@
     listEmptyTitle: $("listEmptyTitle"),
     listEmptyText: $("listEmptyText"),
     listEmptyAction: $("listEmptyAction"),
+    listEmptySecondary: $("listEmptySecondary"),
     loadMoreButton: $("loadMoreButton"),
     listFooterText: $("listFooterText"),
     readerPane: $("readerPane"),
+    readerProgress: $("readerProgress"),
+    readerProgressBar: $("readerProgressBar"),
     readerEmpty: $("readerEmpty"),
+    readerEmptyTitle: $("readerEmptyTitle"),
+    readerEmptyText: $("readerEmptyText"),
+    readerEmptyAction: $("readerEmptyAction"),
     reader: $("reader"),
     readerBack: $("readerBack"),
     readerFeed: $("readerFeed"),
+    readerReading: $("readerReading"),
     readerTime: $("readerTime"),
     readerTitle: $("readerTitle"),
     readerAuthor: $("readerAuthor"),
+    readerSite: $("readerSite"),
+    readerSiteDot: $("readerSiteDot"),
     readerOriginalTop: $("readerOriginalTop"),
+    readerNotice: $("readerNotice"),
+    readerNoticeTitle: $("readerNoticeTitle"),
+    readerNoticeText: $("readerNoticeText"),
+    readerExtractButton: $("readerExtractButton"),
+    readerRetryButton: $("readerRetryButton"),
+    readerNoticeOriginal: $("readerNoticeOriginal"),
     readerBody: $("readerBody"),
     readerOriginalBottom: $("readerOriginalBottom"),
+    readerFooterHint: $("readerFooterHint"),
     starButton: $("starButton"),
     readToggleButton: $("readToggleButton"),
     copyLinkButton: $("copyLinkButton"),
+    deleteSavedButton: $("deleteSavedButton"),
+    fontSmaller: $("fontSmaller"),
+    fontReset: $("fontReset"),
+    fontLarger: $("fontLarger"),
     workspace: document.querySelector(".workspace"),
     statusText: $("statusText"),
     footerStats: $("footerStats"),
@@ -296,8 +324,15 @@
     newCategoryName: $("newCategoryName"),
     addFeedError: $("addFeedError"),
     addFeedSubmit: $("addFeedSubmit"),
+    saveLinkDialog: $("saveLinkDialog"),
+    saveLinkForm: $("saveLinkForm"),
+    saveLinkUrl: $("saveLinkUrl"),
+    saveLinkError: $("saveLinkError"),
+    saveLinkSubmit: $("saveLinkSubmit"),
+    saveLinkFallback: $("saveLinkFallback"),
     settingsDialog: $("settingsDialog"),
     themeSelect: $("themeSelect"),
+    readerFontSize: $("readerFontSize"),
     autoRefresh: $("autoRefresh"),
     refreshInterval: $("refreshInterval"),
     retentionDays: $("retentionDays"),
@@ -324,7 +359,7 @@
     confirmOk: $("confirmOk"),
     shortcutsDialog: $("shortcutsDialog"),
     toast: $("toast"),
-    bylineDot: document.querySelector(".reader-byline .dot-sep"),
+    bylineDot: $("readerBylineDot"),
     searchKbd: document.querySelector(".search-field kbd"),
   };
 
@@ -346,6 +381,7 @@
       articles: 0,
       unread: 0,
       starred: 0,
+      saved: 0,
       last_refresh_at: "",
       database_bytes: 0,
       version: "",
@@ -369,6 +405,8 @@
     confirmAction: null,
     categoryEditingId: null,
     contextMenu: null,
+    readerFontSize: 17,
+    progressFrame: 0,
     settingsNoticeTimer: null,
     opmlNoticeTimer: null,
   };
@@ -470,6 +508,21 @@
     showDialog(ui.addFeedDialog);
     setTimeout(function () {
       ui.feedUrl.focus();
+    }, 30);
+  }
+
+  function openSaveLinkDialog(prefillUrl) {
+    ui.saveLinkForm.reset();
+    formError(ui.saveLinkError, "");
+    ui.saveLinkUrl.value = prefillUrl || "";
+    ui.saveLinkSubmit.disabled = false;
+    ui.saveLinkFallback.disabled = false;
+    ui.saveLinkSubmit.textContent = "提取并保存";
+    ui.saveLinkFallback.textContent = "仅保存链接";
+    showDialog(ui.saveLinkDialog);
+    setTimeout(function () {
+      ui.saveLinkUrl.focus();
+      ui.saveLinkUrl.select();
     }, 30);
   }
 
@@ -680,6 +733,7 @@
     var values = {
       all: state.stats.articles,
       unread: state.stats.unread,
+      saved: state.stats.saved,
       starred: state.stats.starred,
     };
     document.querySelectorAll("[data-count]").forEach(function (node) {
@@ -783,6 +837,8 @@
         " 篇";
     } else if (state.total) {
       meta = "共 " + state.total + " 篇";
+    } else if (state.filter.type === "saved") {
+      meta = "还没有保存文章";
     } else {
       meta = "还没有文章";
     }
@@ -801,6 +857,7 @@
     card.dataset.articleId = String(article.id);
     card.classList.toggle("is-unread", !article.is_read);
     card.classList.toggle("is-read", Boolean(article.is_read));
+    card.classList.toggle("is-saved", article.feed_kind === "saved");
     card.classList.toggle(
       "is-selected",
       Number(state.selectedId) === Number(article.id)
@@ -831,6 +888,16 @@
     var star = el("span", "article-star", "★ 星标");
     star.hidden = !article.is_starred;
     bottom.appendChild(star);
+    if (article.feed_kind === "saved" && !Number(article.word_count)) {
+      bottom.appendChild(el("span", "article-saved", "仅链接"));
+    }
+    var reading = Tools.readingMeta(
+      article.reading_minutes,
+      article.word_count
+    );
+    if (reading) {
+      bottom.appendChild(el("span", "article-reading", reading));
+    }
     bottom.appendChild(el("span", "article-read-state"));
     card.appendChild(bottom);
 
@@ -849,13 +916,11 @@
     var text = "";
     var actionLabel = "";
     var action = null;
+    var secondaryLabel = "";
+    var secondaryAction = null;
+    var type = state.filter.type;
 
-    if (!state.feeds.length && !state.search) {
-      title = "还没有订阅";
-      text = "添加一个 RSS 地址，新的文章会出现在这里。支持 RSS 2.0、RSS 1.0 与 Atom。";
-      actionLabel = "添加第一个订阅";
-      action = openAddFeedDialog;
-    } else if (state.search) {
+    if (state.search) {
       title = "没有找到文章";
       text = "换个关键词试试，或者清除搜索查看全部内容。";
       actionLabel = "清除搜索";
@@ -863,22 +928,57 @@
         clearSearch();
         ui.searchInput.focus();
       };
+    } else if (type === "saved") {
+      title = "稍后读还是空的";
+      text =
+        "看到想读的网页时，用顶部的「收进稍后读」保存。拾页会抓取正文，之后安静地读。";
+      actionLabel = "保存一个链接";
+      action = function () {
+        openSaveLinkDialog("");
+      };
+      secondaryLabel = "添加订阅";
+      secondaryAction = openAddFeedDialog;
+    } else if (!state.feeds.length) {
+      title = "把想读的都收进来";
+      text =
+        "订阅喜欢的网站，或把任何一篇文章存进稍后读，正文会留在这里慢慢读。";
+      actionLabel = "添加订阅";
+      action = openAddFeedDialog;
+      secondaryLabel = "保存链接";
+      secondaryAction = function () {
+        openSaveLinkDialog("");
+      };
     } else if (isUnreadFilter()) {
       title = "没有未读文章";
-      text = "这个范围内的文章都已经读完了。";
+      text = "这个范围内的文章都已经读完了。新内容会在订阅刷新后出现。";
+      actionLabel = "查看全部文章";
+      action = showAllArticles;
+      secondaryLabel = "刷新订阅";
+      secondaryAction = refreshAll;
+    } else if (type === "starred") {
+      title = "还没有星标文章";
+      text = "读到喜欢的文章时，按 S 或点「星标」，它就会留在这里。";
       actionLabel = "查看全部文章";
       action = showAllArticles;
     } else {
       title = "这里还没有文章";
-      text = "订阅可能还没有完成第一次抓取，可以手动刷新一次。";
+      text =
+        "订阅可能还没有完成第一次抓取，可以手动刷新一次；也可以直接保存一个链接。";
       actionLabel = "刷新订阅";
       action = refreshAll;
+      secondaryLabel = "保存链接";
+      secondaryAction = function () {
+        openSaveLinkDialog("");
+      };
     }
 
     ui.listEmptyTitle.textContent = title;
     ui.listEmptyText.textContent = text;
     ui.listEmptyAction.textContent = actionLabel;
     ui.listEmptyAction.onclick = action;
+    ui.listEmptySecondary.hidden = !secondaryLabel;
+    ui.listEmptySecondary.textContent = secondaryLabel;
+    ui.listEmptySecondary.onclick = secondaryAction;
   }
 
   function renderArticles(scrollMode) {
@@ -982,6 +1082,8 @@
       params.feed_id = state.filter.id;
     } else if (type === "category") {
       params.category_id = state.filter.id;
+    } else if (type === "saved") {
+      params.saved = 1;
     } else if (type === "starred") {
       params.starred = 1;
     }
@@ -1049,23 +1151,157 @@
     });
   }
 
+  var FONT_STORAGE_KEY = "shiye-reader-font";
+  var FONT_MIN = 15;
+  var FONT_MAX = 22;
+  var FONT_DEFAULT = 17;
+
+  function loadReaderFontSize() {
+    var stored = null;
+    try {
+      stored = window.localStorage.getItem(FONT_STORAGE_KEY);
+    } catch (error) {
+      stored = null;
+    }
+    return Tools.adjustFontSize(stored, 0, FONT_MIN, FONT_MAX);
+  }
+
+  function applyReaderFontSize(value, options) {
+    options = options || {};
+    var size = Tools.adjustFontSize(value, 0, FONT_MIN, FONT_MAX);
+    state.readerFontSize = size;
+    document.documentElement.style.setProperty(
+      "--reader-font-size",
+      size + "px"
+    );
+    if (ui.readerFontSize) {
+      ui.readerFontSize.value = String(size);
+    }
+    try {
+      window.localStorage.setItem(FONT_STORAGE_KEY, String(size));
+    } catch (error) {
+      /* Font preference simply won't persist. */
+    }
+    if (options.toast) {
+      showToast("正文字号：" + size + " px");
+    }
+    scheduleReaderProgress();
+  }
+
+  function resetReaderProgress() {
+    ui.readerProgress.hidden = true;
+    ui.readerProgressBar.style.width = "0%";
+    ui.readerProgress.removeAttribute("data-value");
+  }
+
+  function updateReaderProgress() {
+    if (!state.readerArticle || ui.reader.hidden) {
+      resetReaderProgress();
+      return;
+    }
+    var percent = Tools.readingProgress(
+      ui.readerPane.scrollTop,
+      ui.readerPane.scrollHeight,
+      ui.readerPane.clientHeight
+    );
+    var scrollable =
+      ui.readerPane.scrollHeight > ui.readerPane.clientHeight + 1;
+    ui.readerProgress.hidden = !scrollable;
+    ui.readerProgressBar.style.width = percent + "%";
+    ui.readerProgress.dataset.value = String(percent);
+  }
+
+  function scheduleReaderProgress() {
+    if (state.progressFrame) {
+      return;
+    }
+    state.progressFrame = window.requestAnimationFrame(function () {
+      state.progressFrame = 0;
+      updateReaderProgress();
+    });
+  }
+
+  function hideReaderNotice() {
+    ui.readerNotice.hidden = true;
+    ui.readerNoticeTitle.textContent = "";
+    ui.readerNoticeText.textContent = "";
+    ui.readerExtractButton.hidden = true;
+    ui.readerExtractButton.disabled = false;
+    ui.readerExtractButton.textContent = "提取正文";
+    ui.readerRetryButton.hidden = true;
+    ui.readerNoticeOriginal.hidden = true;
+    ui.readerNoticeOriginal.removeAttribute("href");
+  }
+
+  function showReaderNotice(options) {
+    options = options || {};
+    ui.readerNoticeTitle.textContent = options.title || "";
+    ui.readerNoticeText.textContent = options.text || "";
+    ui.readerExtractButton.hidden = !options.extract;
+    ui.readerRetryButton.hidden = !options.retry;
+    if (options.original) {
+      ui.readerNoticeOriginal.href = options.original;
+      ui.readerNoticeOriginal.hidden = false;
+    } else {
+      ui.readerNoticeOriginal.removeAttribute("href");
+      ui.readerNoticeOriginal.hidden = true;
+    }
+    ui.readerNotice.hidden = false;
+  }
+
+  function showReaderEmptyState(title, text, actionLabel, action) {
+    state.readerArticle = null;
+    ui.reader.hidden = true;
+    ui.readerEmpty.hidden = false;
+    ui.readerEmptyTitle.textContent = title;
+    ui.readerEmptyText.textContent = text;
+    if (actionLabel && action) {
+      ui.readerEmptyAction.textContent = actionLabel;
+      ui.readerEmptyAction.onclick = action;
+      ui.readerEmptyAction.hidden = false;
+    } else {
+      ui.readerEmptyAction.hidden = true;
+      ui.readerEmptyAction.onclick = null;
+    }
+    resetReaderProgress();
+    hideReaderNotice();
+    document.title = "拾页";
+  }
+
   function resetReaderFor(article) {
     ui.readerEmpty.hidden = true;
     ui.reader.hidden = false;
     ui.readerFeed.textContent = article.feed_title || "订阅";
+    ui.readerFeed.classList.toggle(
+      "is-saved",
+      article.feed_kind === "saved"
+    );
+    ui.readerReading.textContent = "";
+    ui.readerReading.hidden = true;
     ui.readerTime.textContent = Tools.formatFullDate(article.published_at);
     ui.readerTime.dateTime = article.published_at || "";
     ui.readerTitle.textContent = article.title || "(无标题)";
     ui.readerAuthor.hidden = true;
+    ui.readerSite.hidden = true;
     if (ui.bylineDot) {
       ui.bylineDot.hidden = true;
     }
+    if (ui.readerSiteDot) {
+      ui.readerSiteDot.hidden = true;
+    }
     ui.readerOriginalTop.hidden = true;
+    ui.readerOriginalTop.removeAttribute("href");
     ui.readerOriginalBottom.hidden = true;
+    ui.readerOriginalBottom.removeAttribute("href");
     ui.copyLinkButton.hidden = true;
+    ui.deleteSavedButton.hidden = true;
+    hideReaderNotice();
+    resetReaderProgress();
     ui.starButton.setAttribute("aria-pressed", "false");
     ui.readToggleButton.textContent = "…";
+    ui.readerBody.classList.remove("is-fallback");
     ui.readerBody.textContent = "正在载入正文…";
+    document.title = (article.title || "拾页") + " · 拾页";
   }
 
   function fixMediaUrls(root) {
@@ -1091,27 +1327,44 @@
     });
   }
 
-  function renderReaderArticle(article) {
-    ui.readerEmpty.hidden = true;
-    ui.reader.hidden = false;
-    ui.readerFeed.textContent = article.feed_title || "订阅";
+  function renderReaderMeta(article) {
+    var isSaved = article.feed_kind === "saved";
+    var hasAuthor = Boolean(article.author);
+    var hasUrl = Boolean(article.url);
+    var site = siteLabel(article);
+
+    ui.readerFeed.textContent = isSaved
+      ? "稍后读"
+      : article.feed_title || "订阅";
+    ui.readerFeed.classList.toggle("is-saved", isSaved);
+
+    var reading = Tools.readingMeta(
+      article.reading_minutes,
+      article.word_count
+    );
+    ui.readerReading.textContent = reading;
+    ui.readerReading.hidden = !reading;
+
     ui.readerTime.textContent = Tools.formatFullDate(article.published_at);
     ui.readerTime.dateTime = article.published_at || "";
     ui.readerTitle.textContent = article.title || "(无标题)";
 
-    var hasAuthor = Boolean(article.author);
-    var hasUrl = Boolean(article.url);
     ui.readerAuthor.textContent = article.author || "";
     ui.readerAuthor.hidden = !hasAuthor;
+    ui.readerSite.textContent = site;
+    ui.readerSite.hidden = !site;
     if (ui.bylineDot) {
-      ui.bylineDot.hidden = !hasAuthor || !hasUrl;
+      ui.bylineDot.hidden = !(hasAuthor && (site || hasUrl));
+    }
+    if (ui.readerSiteDot) {
+      ui.readerSiteDot.hidden = !(site && hasUrl);
     }
 
     if (hasUrl) {
       ui.readerOriginalTop.href = article.url;
       ui.readerOriginalTop.hidden = false;
       ui.readerOriginalBottom.href = article.url;
-      ui.readerOriginalBottom.hidden = false;
+      ui.readerOriginalBottom.hidden = !article.content;
       ui.copyLinkButton.hidden = false;
     } else {
       ui.readerOriginalTop.removeAttribute("href");
@@ -1120,23 +1373,53 @@
       ui.readerOriginalBottom.hidden = true;
       ui.copyLinkButton.hidden = true;
     }
+    ui.deleteSavedButton.hidden = !isSaved;
+    document.title = (article.title || "拾页") + " · 拾页";
+  }
 
-    var content = article.content || "";
+  function renderReaderArticle(article) {
+    renderReaderMeta(article);
+
+    var content = String(article.content || "");
+    ui.readerFooterHint.hidden = !content;
     if (content) {
+      ui.readerBody.classList.remove("is-fallback");
       ui.readerBody.innerHTML = content;
       fixMediaUrls(ui.readerBody);
     } else {
       ui.readerBody.replaceChildren();
-      var paragraph = el(
-        "p",
-        null,
-        article.summary || "订阅源没有提供正文内容，可以点击下方按钮打开原文。"
-      );
-      ui.readerBody.appendChild(paragraph);
+      ui.readerBody.classList.add("is-fallback");
+      if (article.feed_kind !== "saved") {
+        ui.readerBody.appendChild(
+          el(
+            "p",
+            "reader-summary-fallback",
+            article.summary || "这里没有随文章保存的正文。"
+          )
+        );
+      }
+    }
+
+    hideReaderNotice();
+    if (article.feed_kind === "saved" && !content) {
+      showReaderNotice({
+        title: "这里只保存了链接",
+        text:
+          "保存时还没有抓到正文。现在可以再试一次，提取到之后会留在稍后读里。",
+        extract: true,
+        original: article.url || "",
+      });
+    } else if (!content && article.url) {
+      showReaderNotice({
+        title: "这篇只有摘要",
+        text: "订阅源没有提供完整正文。可以打开原文，继续阅读整篇文章。",
+        original: article.url,
+      });
     }
 
     updateReaderControls();
-    document.title = (article.title || "拾页") + " · 拾页";
+    updateArticleCardMeta(article);
+    scheduleReaderProgress();
   }
 
   function updateReaderControls() {
@@ -1153,6 +1436,29 @@
       label.textContent = article.is_starred ? "已加星标" : "星标";
     }
     ui.readToggleButton.textContent = article.is_read ? "标为未读" : "标为已读";
+    ui.deleteSavedButton.hidden = article.feed_kind !== "saved";
+  }
+
+  function updateArticleCardMeta(article) {
+    var index = -1;
+    for (var i = 0; i < state.articles.length; i += 1) {
+      if (Number(state.articles[i].id) === Number(article.id)) {
+        index = i;
+        break;
+      }
+    }
+    if (index === -1) {
+      return;
+    }
+    var merged = Object.assign({}, state.articles[index], article);
+    state.articles[index] = merged;
+    var card = ui.articleList.querySelector(
+      '[data-article-id="' + article.id + '"]'
+    );
+    if (card && card.parentElement) {
+      card.parentElement.replaceWith(createArticleCard(merged));
+      updateCardSelection();
+    }
   }
 
   async function openArticle(articleId) {
@@ -1184,10 +1490,86 @@
       if (requestId !== state.readerRequestId) {
         return;
       }
-      ui.readerBody.textContent = "正文加载失败：" + errorMessage(error);
-      ui.readToggleButton.textContent = "标为已读";
-      handleActionError(error, "正文加载失败");
+      if (error && error.status === 404) {
+        handleMissingArticle(articleId);
+        return;
+      }
+      state.readerArticle = Object.assign({}, article);
+      renderReaderMeta(article);
+      ui.readerBody.replaceChildren();
+      ui.readerBody.classList.add("is-fallback");
+      ui.readerBody.appendChild(
+        el(
+          "p",
+          "reader-summary-fallback",
+          article.summary ||
+            "正文暂时没有加载出来。可以重试，或打开原文继续阅读。"
+        )
+      );
+      updateReaderControls();
+      showReaderNotice({
+        title: "正文没有加载出来",
+        text: errorMessage(error),
+        retry: true,
+        original: article.url || "",
+      });
+      resetReaderProgress();
     }
+  }
+
+  function removeArticleFromList(articleId) {
+    var index = -1;
+    for (var i = 0; i < state.articles.length; i += 1) {
+      if (Number(state.articles[i].id) === Number(articleId)) {
+        index = i;
+        break;
+      }
+    }
+    if (index === -1) {
+      return null;
+    }
+    var removed = state.articles.splice(index, 1)[0];
+    state.total = Math.max(0, state.total - 1);
+    if (!removed.is_read) {
+      adjustUnread(removed.feed_id, -1);
+    }
+    if (removed.feed_kind === "saved") {
+      state.stats.saved = Math.max(0, Number(state.stats.saved || 0) - 1);
+      renderNavCounts();
+    }
+    var card = ui.articleList.querySelector(
+      '[data-article-id="' + articleId + '"]'
+    );
+    if (card) {
+      var item = card.closest('[role="listitem"]');
+      (item || card).remove();
+    }
+    if (!state.articles.length) {
+      renderArticles("keep");
+    } else {
+      renderFilterHeader();
+      updateListFooter();
+    }
+    updateFooter();
+    return removed;
+  }
+
+  function handleMissingArticle(articleId) {
+    removeArticleFromList(articleId);
+    if (Number(state.selectedId) === Number(articleId)) {
+      state.selectedId = null;
+    }
+    closeMobileReader();
+    showReaderEmptyState(
+      "这篇文章已不在收件箱里",
+      "它可能已经被清理、移出稍后读，或来自一个已删除的订阅。列表已经更新，可以继续读其他内容。",
+      "回到全部文章",
+      showAllArticles
+    );
+    showToast("这篇文章已不在收件箱里，列表已更新。");
+    reloadCollections().catch(function () {
+      /* The list already reflects the removal. */
+    });
   }
 
   function closeMobileReader() {
@@ -1359,6 +1741,8 @@
             body.feed_id = scope.id;
           } else if (scope.type === "category") {
             body.category_id = scope.id;
+          } else if (scope.type === "saved") {
+            body.saved = true;
           }
           await Api.post("articles/mark-all-read", body);
         }
@@ -1450,7 +1834,8 @@
       formatCount(stats.unread) +
       " 未读 · " +
       formatCount(stats.starred) +
-      " 星标";
+      " 星标" +
+      (Number(stats.saved) ? " · " + formatCount(stats.saved) + " 稍后读" : "");
   }
 
   function updateRefreshIndicator() {
@@ -1462,6 +1847,11 @@
 
   async function refreshAll() {
     if (state.refreshing) {
+      return;
+    }
+    if (!state.feeds.length) {
+      showToast("还没有订阅。先添加一个订阅源，或保存一个链接。");
+      openAddFeedDialog();
       return;
     }
     state.refreshing = true;
@@ -1519,7 +1909,8 @@
         stats.articles !== previous.articles ||
         stats.feeds !== previous.feeds ||
         stats.unread !== previous.unread ||
-        stats.starred !== previous.starred;
+        stats.starred !== previous.starred ||
+        stats.saved !== previous.saved;
       state.stats = Object.assign({}, previous, stats);
       updateRefreshIndicator();
       renderNavCounts();
@@ -1553,6 +1944,7 @@
   function populateSettingsForm() {
     var settings = state.settings || DEFAULT_SETTINGS;
     ui.themeSelect.value = Theme ? Theme.get() : "auto";
+    ui.readerFontSize.value = String(state.readerFontSize);
     ui.autoRefresh.checked = Boolean(settings.auto_refresh);
     setSelectValue(ui.refreshInterval, settings.refresh_interval);
     setSelectValue(ui.retentionDays, settings.retention_days);
@@ -1567,7 +1959,8 @@
       (stats.feeds || 0) +
       " 个订阅 · " +
       (stats.articles || 0) +
-      " 篇文章";
+      " 篇文章" +
+      (Number(stats.saved) ? " · " + stats.saved + " 篇稍后读" : "");
   }
 
   function renderSettingsFeeds() {
@@ -1968,6 +2361,131 @@
     }
   }
 
+  // ------------------------------------------------------------------ read later
+
+  async function submitSaveLink(event) {
+    event.preventDefault();
+    await saveLinkRequest(false);
+  }
+
+  async function saveLinkRequest(fallback) {
+    var url = ui.saveLinkUrl.value.trim();
+    if (!url) {
+      formError(ui.saveLinkError, "请先粘贴一个文章链接。");
+      ui.saveLinkUrl.focus();
+      return;
+    }
+    formError(ui.saveLinkError, "");
+    ui.saveLinkSubmit.disabled = true;
+    ui.saveLinkFallback.disabled = true;
+    if (fallback) {
+      ui.saveLinkFallback.textContent = "正在保存…";
+    } else {
+      ui.saveLinkSubmit.textContent = "正在提取…";
+    }
+
+    try {
+      var result = await Api.post(
+        "saved",
+        { url: url, fallback: Boolean(fallback) },
+        60000
+      );
+      ui.saveLinkDialog.close();
+      await reloadCollections();
+      var openSaved = state.filter.type === "saved" || !state.feeds.length;
+      if (openSaved) {
+        state.filter = { type: "saved" };
+        state.unreadOnly = false;
+        renderSidebar();
+        renderFilterHeader();
+        await loadArticles(true);
+        if (result && result.article) {
+          await openArticle(result.article.id);
+        }
+      } else {
+        await loadArticles(true);
+      }
+      if (result && result.created === false) {
+        showToast("这个链接已经在稍后读里了。");
+      } else if (result && result.extracted === false) {
+        showToast("链接已保存。打开后可以再提取正文。");
+      } else {
+        showToast("已收进稍后读。");
+      }
+    } catch (error) {
+      var message = errorMessage(error);
+      if (!fallback && error && error.status === 422) {
+        message += " 如果一直抓不到，可以点「仅保存链接」先把链接存下来。";
+      }
+      formError(ui.saveLinkError, message);
+    } finally {
+      ui.saveLinkSubmit.disabled = false;
+      ui.saveLinkFallback.disabled = false;
+      ui.saveLinkSubmit.textContent = "提取并保存";
+      ui.saveLinkFallback.textContent = "仅保存链接";
+    }
+  }
+
+  async function extractSavedArticle() {
+    var article = state.readerArticle;
+    if (!article) {
+      return;
+    }
+    ui.readerExtractButton.disabled = true;
+    ui.readerExtractButton.textContent = "正在提取…";
+    try {
+      var data = await Api.post(
+        "articles/" + article.id + "/extract",
+        {},
+        60000
+      );
+      state.readerArticle = data.article;
+      renderReaderArticle(data.article);
+      ui.readerPane.scrollTop = 0;
+      updateReaderControls();
+      await reloadCollections();
+      showToast("正文已提取。");
+    } catch (error) {
+      showReaderNotice({
+        title: "这次还是没能提取到正文",
+        text: errorMessage(error) + " 可以稍后再试，或直接打开原文。",
+        extract: true,
+        original: article.url || "",
+      });
+      ui.readerExtractButton.disabled = false;
+      ui.readerExtractButton.textContent = "重试提取";
+    }
+  }
+
+  function confirmDeleteSavedArticle() {
+    var article = state.readerArticle;
+    if (!article || article.feed_kind !== "saved") {
+      return;
+    }
+    askConfirm({
+      title: "移出稍后读",
+      text:
+        "将「" +
+        (article.title || "这篇文章") +
+        "」移出稍后读？原文网站上的文章不会被删除。",
+      okLabel: "移出",
+      action: async function () {
+        await Api.del("articles/" + article.id);
+        state.selectedId = null;
+        closeMobileReader();
+        showReaderEmptyState(
+          "已移出稍后读",
+          "这篇文章已经从稍后读移除。列表已经更新，可以继续读其他内容。",
+          "回到全部文章",
+          showAllArticles
+        );
+        await reloadCollections();
+        await loadArticles(true);
+        showToast("已移出稍后读。");
+      },
+    });
+  }
+
   async function submitCategory(event) {
     event.preventDefault();
     var name = ui.categoryNameInput.value.trim();
@@ -1998,20 +2516,53 @@
 
   // ----------------------------------------------------------------------- boot
 
+  function checkHealth(health) {
+    if (!health || health.app !== "shiye") {
+      throw new AppError(
+        "服务响应异常，请确认拾页已正确安装。",
+        "invalid_health",
+        "gateway",
+        200
+      );
+    }
+    return health;
+  }
+
+  async function discoverApiBase() {
+    var lastError = null;
+    for (var i = 0; i < API_BASES.length; i += 1) {
+      Api.base = API_BASES[i];
+      try {
+        return checkHealth(await Api.get("health", { timeout: 7000 }));
+      } catch (error) {
+        lastError = error;
+        if (
+          error &&
+          (error.kind === "offline" ||
+            error.kind === "network" ||
+            error.kind === "session")
+        ) {
+          throw error;
+        }
+      }
+    }
+    throw (
+      lastError ||
+      new AppError(
+        "无法连接拾页服务，请确认应用正在运行。",
+        "offline",
+        "offline",
+        0
+      )
+    );
+  }
+
   async function boot() {
     setConnection("pending", "连接中");
     hideListError();
     ui.listMeta.textContent = "正在连接服务…";
     try {
-      var health = await Api.get("health");
-      if (!health || health.app !== "shiye") {
-        throw new AppError(
-          "服务响应异常，请确认拾页已正确安装。",
-          "invalid_health",
-          "gateway",
-          200
-        );
-      }
+      var health = await discoverApiBase();
       applyVersion(health.version);
       var results = await Promise.all([
         Api.get("feeds"),
@@ -2055,6 +2606,7 @@
     ui.listEmptyAction.onclick = function () {
       boot();
     };
+    ui.listEmptySecondary.hidden = true;
     ui.loadMoreButton.hidden = true;
     ui.listFooterText.textContent = "未连接";
     ui.markAllButton.disabled = true;
@@ -2181,6 +2733,11 @@
       toggleUnreadOnly();
       return;
     }
+    if (key === "l" || key === "L") {
+      event.preventDefault();
+      openSaveLinkDialog("");
+      return;
+    }
     if (key === "r" || key === "R") {
       event.preventDefault();
       refreshAll();
@@ -2208,6 +2765,17 @@
     }
   }
 
+  function syncThemeToggle() {
+    var resolved = Theme.resolve(Theme.get());
+    var label =
+      resolved === "dark" ? "切换到浅色主题" : "切换到深色主题";
+    ui.themeToggle.setAttribute("aria-label", label);
+    ui.themeToggle.title = label;
+    if (ui.settingsDialog.open) {
+      ui.themeSelect.value = Theme.get();
+    }
+  }
+
   function bindEvents() {
     ui.sidebarToggle.addEventListener("click", toggleSidebar);
     ui.sidebarScrim.addEventListener("click", closeSidebar);
@@ -2224,6 +2792,11 @@
     });
     [ui.addFeedButton, ui.sidebarAddFeed].forEach(function (button) {
       button.addEventListener("click", openAddFeedDialog);
+    });
+    [ui.saveLinkButton, ui.sidebarSaveLink].forEach(function (button) {
+      button.addEventListener("click", function () {
+        openSaveLinkDialog("");
+      });
     });
 
     ui.searchInput.addEventListener("input", function () {
@@ -2259,14 +2832,14 @@
     ui.refreshButton.addEventListener("click", refreshAll);
     ui.settingsButton.addEventListener("click", openSettingsDialog);
     ui.themeToggle.addEventListener("click", function () {
-      var resolved = Theme.cycle();
+      Theme.toggle();
       var preference = Theme.get();
       var labels = { auto: "跟随系统", light: "浅色", dark: "深色" };
-      if (ui.settingsDialog.open) {
-        ui.themeSelect.value = preference;
-      }
-      showToast("主题：" + (labels[preference] || resolved));
+      showToast("主题：" + (labels[preference] || preference));
+      syncThemeToggle();
     });
+    window.addEventListener("shiye-theme-change", syncThemeToggle);
+    syncThemeToggle();
     ui.themeSelect.addEventListener("change", function () {
       Theme.set(ui.themeSelect.value);
     });
@@ -2283,6 +2856,10 @@
       }
     });
     ui.addFeedForm.addEventListener("submit", submitAddFeed);
+    ui.saveLinkForm.addEventListener("submit", submitSaveLink);
+    ui.saveLinkFallback.addEventListener("click", function () {
+      saveLinkRequest(true);
+    });
     ui.categoryForm.addEventListener("submit", submitCategory);
     ui.saveSettingsButton.addEventListener("click", saveSettings);
     ui.importOpmlButton.addEventListener("click", function () {
@@ -2308,7 +2885,31 @@
       );
     });
     ui.copyLinkButton.addEventListener("click", copyArticleLink);
+    ui.deleteSavedButton.addEventListener("click", confirmDeleteSavedArticle);
+    ui.readerExtractButton.addEventListener("click", extractSavedArticle);
+    ui.readerRetryButton.addEventListener("click", function () {
+      if (state.selectedId) {
+        openArticle(Number(state.selectedId));
+      }
+    });
     ui.readerBack.addEventListener("click", closeMobileReader);
+
+    ui.fontSmaller.addEventListener("click", function () {
+      applyReaderFontSize(state.readerFontSize - 1, { toast: true });
+    });
+    ui.fontReset.addEventListener("click", function () {
+      applyReaderFontSize(FONT_DEFAULT, { toast: true });
+    });
+    ui.fontLarger.addEventListener("click", function () {
+      applyReaderFontSize(state.readerFontSize + 1, { toast: true });
+    });
+    ui.readerFontSize.addEventListener("change", function () {
+      applyReaderFontSize(ui.readerFontSize.value);
+    });
+    ui.readerPane.addEventListener("scroll", scheduleReaderProgress, {
+      passive: true,
+    });
+    window.addEventListener("resize", scheduleReaderProgress);
 
     ui.confirmCancel.addEventListener("click", function () {
       state.confirmAction = null;
@@ -2381,6 +2982,7 @@
   function init() {
     bindEvents();
     syncSearchUi();
+    applyReaderFontSize(loadReaderFontSize());
     if (Theme) {
       ui.themeSelect.value = Theme.get();
     }

@@ -31,6 +31,7 @@ USER_AGENT = (
     f"Shiye/{__version__} (+https://github.com/642671/shiye-tos7)"
 )
 MAX_FEED_BYTES = 5 * 1024 * 1024
+MAX_PAGE_BYTES = 10 * 1024 * 1024
 MAX_ENTRIES = 200
 MAX_TITLE_CHARS = 500
 MAX_PERSON_CHARS = 200
@@ -115,19 +116,35 @@ class FetchedImage:
 
 
 def normalize_feed_url(raw: Any) -> str:
+    return _normalize_url(raw, "订阅地址", "请输入订阅地址")
+
+
+def normalize_page_url(raw: Any) -> str:
+    return _normalize_url(raw, "文章链接", "请输入文章链接")
+
+
+def _normalize_url(raw: Any, label: str, empty_message: str) -> str:
     value = str(raw or "").strip()
     if not value:
-        raise FeedError("请输入订阅地址", "invalid_url")
+        raise FeedError(empty_message, "invalid_url")
     if len(value) > 2048:
-        raise FeedError("订阅地址过长", "invalid_url")
+        raise FeedError(f"{label}过长", "invalid_url")
+    if re.match(r"^[A-Za-z][A-Za-z0-9+.\-]*:", value) and not re.match(
+        r"^https?://", value, re.IGNORECASE
+    ):
+        raise FeedError(f"只支持 http/https {label}", "invalid_url")
     if "://" not in value:
         value = "https://" + value
     parts = urllib.parse.urlsplit(value)
     scheme = parts.scheme.lower()
     if scheme not in {"http", "https"} or not parts.hostname:
-        raise FeedError("只支持 http/https 订阅地址", "invalid_url")
+        raise FeedError(f"只支持 http/https {label}", "invalid_url")
+    try:
+        parts.port
+    except ValueError as exc:
+        raise FeedError(f"{label}的端口无效", "invalid_url") from exc
     if parts.username or parts.password:
-        raise FeedError("订阅地址不能包含用户名或密码", "invalid_url")
+        raise FeedError(f"{label}不能包含用户名或密码", "invalid_url")
     netloc = parts.netloc
     path = parts.path or "/"
     return urllib.parse.urlunsplit((scheme, netloc, path, parts.query, ""))
@@ -149,10 +166,16 @@ class _RedirectHandler(urllib.request.HTTPRedirectHandler):
     max_repeats = 2
     max_redirections = MAX_REDIRECTS
 
+    def __init__(self, label: str = "订阅源") -> None:
+        super().__init__()
+        self.label = label
+
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         target = urllib.parse.urlsplit(newurl)
         if target.scheme.lower() not in {"http", "https"}:
-            raise FeedError("订阅源重定向到了不支持的协议", "invalid_redirect")
+            raise FeedError(
+                f"{self.label}重定向到了不支持的协议", "invalid_redirect"
+            )
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
@@ -170,13 +193,13 @@ def _read_limited(response: Any, limit: int) -> bytes:
     return b"".join(chunks)
 
 
-def _decompress(body: bytes, encoding: str) -> bytes:
+def _decompress(body: bytes, encoding: str, label: str = "订阅源") -> bytes:
     value = (encoding or "").strip().lower()
     if value in {"gzip", "x-gzip"}:
         try:
             return gzip.decompress(body)
         except OSError as exc:
-            raise FeedError(f"订阅源的 gzip 内容损坏：{exc}", "bad_encoding") from exc
+            raise FeedError(f"{label}的 gzip 内容损坏：{exc}", "bad_encoding") from exc
     if value == "deflate":
         try:
             return zlib.decompress(body)
@@ -185,9 +208,17 @@ def _decompress(body: bytes, encoding: str) -> bytes:
                 return zlib.decompress(body, -zlib.MAX_WBITS)
             except zlib.error as exc:
                 raise FeedError(
-                    f"订阅源的 deflate 内容损坏：{exc}", "bad_encoding"
+                    f"{label}的 deflate 内容损坏：{exc}", "bad_encoding"
                 ) from exc
     return body
+
+
+def _limit_label(max_bytes: int) -> str:
+    mib = max_bytes / (1024 * 1024)
+    if mib >= 1:
+        rounded = int(mib) if abs(mib - int(mib)) < 0.05 else round(mib, 1)
+        return f"{rounded} MiB"
+    return f"{max(1, round(max_bytes / 1024))} KiB"
 
 
 def fetch(
@@ -201,8 +232,10 @@ def fetch(
         "application/rss+xml, application/atom+xml, application/xml, "
         "text/xml, text/html;q=0.8, */*;q=0.5"
     ),
+    label: str = "订阅源",
+    invalid_label: str = "订阅地址",
 ) -> FetchResult:
-    target = _validate_http_url(url, "订阅地址")
+    target = _validate_http_url(url, invalid_label)
     headers = {
         "User-Agent": USER_AGENT,
         "Accept": accept,
@@ -213,7 +246,8 @@ def fetch(
     if last_modified:
         headers["If-Modified-Since"] = last_modified
     request = urllib.request.Request(target, headers=headers, method="GET")
-    opener = urllib.request.build_opener(_RedirectHandler())
+    opener = urllib.request.build_opener(_RedirectHandler(label))
+    limit_text = _limit_label(max_bytes)
 
     try:
         response = opener.open(request, timeout=timeout)
@@ -230,36 +264,38 @@ def fetch(
         detail = f"HTTP {exc.code}"
         if exc.reason:
             detail += f" {exc.reason}"
-        raise FeedError(f"订阅源返回 {detail}", "http_error") from exc
+        raise FeedError(f"{label}返回 {detail}", "http_error") from exc
     except urllib.error.URLError as exc:
         reason = exc.reason
         if isinstance(reason, (socket.timeout, TimeoutError)):
-            message = "订阅源连接超时"
+            message = f"{label}连接超时"
         elif isinstance(reason, ssl.SSLError):
-            message = f"订阅源 TLS 证书校验失败：{reason}"
+            message = f"{label} TLS 证书校验失败：{reason}"
         elif isinstance(reason, socket.gaierror):
-            message = "无法解析订阅源域名，请检查 NAS 的网络与 DNS"
+            message = f"无法解析{label}域名，请检查 NAS 的网络与 DNS"
         else:
-            message = f"无法连接订阅源：{reason}"
+            message = f"无法连接{label}：{reason}"
         raise FeedError(message, "network_error") from exc
     except (TimeoutError, socket.timeout) as exc:
-        raise FeedError("订阅源连接超时", "network_error") from exc
+        raise FeedError(f"{label}连接超时", "network_error") from exc
 
     with response:
         status = int(getattr(response, "status", 200) or 200)
         if status >= 400:
-            raise FeedError(f"订阅源返回 HTTP {status}", "http_error")
+            raise FeedError(f"{label}返回 HTTP {status}", "http_error")
         content_encoding = response.headers.get("Content-Encoding", "")
         raw = _read_limited(response, max_bytes)
         if len(raw) > max_bytes:
-            raise FeedError("订阅源超过 5 MiB 大小限制", "too_large")
-        body = _decompress(raw, content_encoding)
+            raise FeedError(f"{label}超过 {limit_text} 大小限制", "too_large")
+        body = _decompress(raw, content_encoding, label=label)
         if len(body) > max_bytes:
-            raise FeedError("订阅源解压后超过 5 MiB 大小限制", "too_large")
+            raise FeedError(
+                f"{label}解压后超过 {limit_text} 大小限制", "too_large"
+            )
         content_type = (response.headers.get("Content-Type") or "").split(";", 1)[0]
         charset = response.headers.get_content_charset() or ""
         final_url = response.geturl() or target
-        _validate_http_url(final_url, "订阅源最终地址")
+        _validate_http_url(final_url, f"{label}最终地址")
         return FetchResult(
             url=target,
             final_url=final_url,
@@ -521,6 +557,102 @@ def _feed_icon(channel: ET.Element, base_url: str) -> str:
     if urllib.parse.urlsplit(resolved).scheme.lower() not in {"http", "https"}:
         return ""
     return resolved
+
+
+_META_CHARSET = re.compile(
+    rb"<meta[^>]+charset\s*=\s*[\"']?\s*([A-Za-z0-9._-]+)", re.IGNORECASE
+)
+
+
+def decode_html_body(body: bytes, header_charset: str = "") -> str:
+    """Decode an HTML page, checking meta charset tags as fallback."""
+
+    declared = ""
+    match = _META_CHARSET.search(body[:8192])
+    if match:
+        declared = match.group(1).decode("ascii", "ignore")
+    candidates = (
+        _encoding_candidates(header_charset)
+        + _encoding_candidates(declared)
+        + _encoding_candidates(_xml_declared(body))
+    )
+    for bom, encoding in _BOMS:
+        if body.startswith(bom):
+            try:
+                return body[len(bom) :].decode(encoding, "strict")
+            except (LookupError, UnicodeDecodeError):
+                break
+    for encoding in candidates:
+        try:
+            return body.decode(encoding, "strict")
+        except (LookupError, UnicodeDecodeError):
+            continue
+    for encoding in ("utf-8", "gb18030", "big5hkscs", "cp1252"):
+        try:
+            return body.decode(encoding, "strict")
+        except (LookupError, UnicodeDecodeError):
+            continue
+    return body.decode("utf-8", "replace")
+
+
+def _xml_declared(body: bytes) -> str:
+    match = _XML_DECL.search(body[:1024])
+    return match.group(1).decode("ascii", "ignore") if match else ""
+
+
+def _feed_address_error() -> FeedError:
+    return FeedError(
+        "这是一个订阅源地址；请直接填写文章网页链接，或在「订阅」里添加它",
+        "is_feed",
+    )
+
+
+def _looks_like_feed(result: FetchResult, text: str) -> bool:
+    if result.content_type in _FEED_TYPES:
+        return True
+    head = text.lstrip()[:2048]
+    if not head.startswith("<?xml") and not head.startswith("<rss") and not head.startswith("<feed") and not head.startswith("<rdf"):
+        return False
+    return bool(
+        re.search(r"<(?:rss|feed|rdf:RDF)[\s>]", head, re.IGNORECASE)
+    )
+
+
+def fetch_page(
+    raw_url: str,
+    *,
+    timeout: float = FETCH_TIMEOUT,
+) -> tuple[FetchResult, str]:
+    """Fetch an ordinary web page for the save-for-later reader."""
+
+    url = normalize_page_url(raw_url)
+    result = fetch(
+        url,
+        timeout=timeout,
+        max_bytes=MAX_PAGE_BYTES,
+        accept=(
+            "text/html, application/xhtml+xml, application/xml;q=0.8, "
+            "*/*;q=0.5"
+        ),
+        label="这篇文章",
+        invalid_label="文章链接",
+    )
+    if result.not_modified:
+        raise FeedError("这个页面没有返回内容", "no_content")
+    content_type = result.content_type
+    if content_type in _FEED_TYPES:
+        raise _feed_address_error()
+    if content_type and not (
+        content_type.startswith("text/")
+        or content_type in {"application/xhtml+xml", "application/xml"}
+        or "html" in content_type
+        or content_type == "application/octet-stream"
+    ):
+        raise FeedError("这个链接不是网页，无法提取正文", "not_html")
+    text = decode_html_body(result.body, result.charset)
+    if _looks_like_feed(result, text):
+        raise _feed_address_error()
+    return result, text
 
 
 def parse_feed(text: str, base_url: str = "") -> ParsedFeed:

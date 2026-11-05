@@ -105,6 +105,7 @@ test("scopeLabel resolves scopes", () => {
   const categories = [{ id: 3, name: "Tech" }];
   assert.equal(Tools.scopeLabel({ type: "all" }, feeds, categories), "全部文章");
   assert.equal(Tools.scopeLabel({ type: "unread" }, feeds, categories), "未读");
+  assert.equal(Tools.scopeLabel({ type: "saved" }, feeds, categories), "稍后读");
   assert.equal(Tools.scopeLabel({ type: "starred" }, feeds, categories), "星标");
   assert.equal(
     Tools.scopeLabel({ type: "feed", id: "7" }, feeds, categories),
@@ -133,6 +134,67 @@ test("formatBytes scales units", () => {
   assert.equal(Tools.formatBytes(5 * 1024 * 1024), "5 MiB");
   assert.equal(Tools.formatBytes(2.5 * 1024 * 1024 * 1024), "2.5 GiB");
   assert.equal(Tools.formatBytes("nope"), "0 B");
+});
+
+test("readingMeta describes length and minutes", () => {
+  assert.equal(Tools.formatWordCount(0), "");
+  assert.equal(Tools.formatWordCount(980), "980 字");
+  assert.equal(Tools.formatWordCount(12800), "1.3 万字");
+  assert.equal(Tools.readingMeta(4, 1800), "约 4 分钟 · 1800 字");
+  assert.equal(Tools.readingMeta(2, 0), "约 2 分钟");
+  assert.equal(Tools.readingMeta(0, 640), "640 字");
+  assert.equal(Tools.readingMeta(0, 0), "");
+  assert.equal(Tools.readingMeta("x", "y"), "");
+});
+
+test("readingProgress tracks the scrollable part of the article", () => {
+  assert.equal(Tools.readingProgress(0, 1000, 500), 0);
+  assert.equal(Tools.readingProgress(250, 1000, 500), 50);
+  assert.equal(Tools.readingProgress(500, 1000, 500), 100);
+  assert.equal(Tools.readingProgress(900, 1000, 500), 100);
+  assert.equal(Tools.readingProgress(0, 400, 500), 0);
+  assert.equal(Tools.readingProgress(-200, 1000, 500), 0);
+  assert.equal(Tools.readingProgress(0, 0, 500), 0);
+  assert.equal(Tools.readingProgress("x", 1000, 500), 0);
+});
+
+test("adjustFontSize clamps and rounds", () => {
+  assert.equal(Tools.adjustFontSize(17, 1, 15, 24), 18);
+  assert.equal(Tools.adjustFontSize(24, 1, 15, 24), 24);
+  assert.equal(Tools.adjustFontSize(15, -1, 15, 24), 15);
+  assert.equal(Tools.adjustFontSize("bad", 2, 15, 24), 19);
+  assert.equal(Tools.adjustFontSize(18.4, "x", 15, 24), 18);
+});
+
+test("apiBaseCandidates orders proxy prefixes", () => {
+  assert.deepEqual(Tools.apiBaseCandidates("/"), [
+    "/api/",
+    "/v2/proxy/shiye/api/",
+    "/proxy/shiye/api/",
+    "/shiye/api/",
+  ]);
+  assert.deepEqual(Tools.apiBaseCandidates("/v2/proxy/shiye/"), [
+    "/v2/proxy/shiye/api/",
+    "/proxy/shiye/api/",
+    "/shiye/api/",
+  ]);
+  assert.deepEqual(Tools.apiBaseCandidates("/proxy/shiye/index.html"), [
+    "/proxy/shiye/api/",
+    "/v2/proxy/shiye/api/",
+    "/shiye/api/",
+  ]);
+  assert.deepEqual(Tools.apiBaseCandidates("/custom/app/"), [
+    "/custom/app/api/",
+    "/v2/proxy/shiye/api/",
+    "/proxy/shiye/api/",
+    "/shiye/api/",
+  ]);
+  assert.deepEqual(Tools.apiBaseCandidates(""), [
+    "/api/",
+    "/v2/proxy/shiye/api/",
+    "/proxy/shiye/api/",
+    "/shiye/api/",
+  ]);
 });
 
 test("debounce coalesces calls", async () => {

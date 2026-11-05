@@ -2,7 +2,7 @@
 
 ```text
 shiye-tos7/
-├─ VERSION                          当前版本号（0.1.0）
+├─ VERSION                          当前版本号（0.2.0）
 ├─ config.ini                       TOS 应用元数据（JSON）
 ├─ shiye.lang                       14 种语言的商店文案
 ├─ shiye.env                        systemd 环境变量
@@ -19,6 +19,7 @@ shiye-tos7/
 │  ├─ shiye/
 │  │  ├─ __init__.py                APP_ID / APP_NAME / __version__
 │  │  ├─ feeds.py                   HTTP 抓取、编码识别、RSS/RDF/Atom、OPML
+│  │  ├─ readable.py               保存链接时的正文提取（容器评分）
 │  │  ├─ sanitize.py                HTML 白名单、跟踪参数、图片代理、文本提取
 │  │  ├─ store.py                   SQLite schema 与数据访问
 │  │  ├─ service.py                 业务编排、调度器、线程池
@@ -26,6 +27,7 @@ shiye-tos7/
 │  │  └─ util.py                    时间、整数、文本和 LIKE 工具
 │  └─ tests/
 │     ├─ test_feeds.py              抓取、解码、解析、发现、OPML
+│     ├─ test_readable.py           正文提取、元数据和失败路径
 │     ├─ test_sanitize.py           清洗规则和文本提取
 │     ├─ test_store.py              数据模型、筛选、搜索、清理、设置
 │     ├─ test_service.py            业务逻辑（网络 mock）

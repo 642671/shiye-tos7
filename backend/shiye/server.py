@@ -50,6 +50,7 @@ _FEED_REFRESH = re.compile(r"^/api/feeds/(\d+)/refresh$")
 _ARTICLE_PATH = re.compile(r"^/api/articles/(\d+)$")
 _ARTICLE_READ = re.compile(r"^/api/articles/(\d+)/read$")
 _ARTICLE_STAR = re.compile(r"^/api/articles/(\d+)/star$")
+_ARTICLE_EXTRACT = re.compile(r"^/api/articles/(\d+)/extract$")
 _CATEGORY_PATH = re.compile(r"^/api/categories/(\d+)$")
 
 
@@ -223,11 +224,25 @@ class AppHandler(BaseHTTPRequestHandler):
                 category_id=_query_value(query, "category_id"),
                 unread_only=_as_bool(_query_value(query, "unread")),
                 starred_only=_as_bool(_query_value(query, "starred")),
+                saved_only=_as_bool(_query_value(query, "saved")),
                 search=_query_value(query, "q"),
                 limit=_query_value(query, "limit", "30"),
                 offset=_query_value(query, "offset", "0"),
             )
             self._send_json(HTTPStatus.OK, result)
+            return
+
+        if path == "/api/saved":
+            if method != "POST":
+                self._method_not_allowed("POST")
+                return
+            body = self._read_json()
+            result = self.service.save_article(
+                body.get("url"),
+                fallback=_as_bool(body.get("fallback")),
+                title=body.get("title", ""),
+            )
+            self._send_json(HTTPStatus.CREATED, result)
             return
 
         if path == "/api/articles/mark-read":
@@ -247,17 +262,32 @@ class AppHandler(BaseHTTPRequestHandler):
                 return
             body = self._read_json()
             result = self.service.mark_all_read(
-                feed_id=body.get("feed_id"), category_id=body.get("category_id")
+                feed_id=body.get("feed_id"),
+                category_id=body.get("category_id"),
+                saved_only=_as_bool(body.get("saved")),
             )
             self._send_json(HTTPStatus.OK, result)
             return
 
         match = _ARTICLE_PATH.match(path)
         if match:
-            if method != "GET":
-                self._method_not_allowed("GET")
+            if method == "GET":
+                article = self.service.get_article(int(match.group(1)))
+                self._send_json(HTTPStatus.OK, {"article": article})
                 return
-            article = self.service.get_article(int(match.group(1)))
+            if method == "DELETE":
+                result = self.service.delete_article(int(match.group(1)))
+                self._send_json(HTTPStatus.OK, result)
+                return
+            self._method_not_allowed("GET, DELETE")
+            return
+
+        match = _ARTICLE_EXTRACT.match(path)
+        if match:
+            if method != "POST":
+                self._method_not_allowed("POST")
+                return
+            article = self.service.reload_saved_content(int(match.group(1)))
             self._send_json(HTTPStatus.OK, {"article": article})
             return
 

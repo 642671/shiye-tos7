@@ -161,6 +161,9 @@
     if (scope.type === "unread") {
       return "未读";
     }
+    if (scope.type === "saved") {
+      return "稍后读";
+    }
     if (scope.type === "starred") {
       return "星标";
     }
@@ -196,6 +199,109 @@
     return (bytes / (1024 * 1024 * 1024)).toFixed(1).replace(/\.0$/, "") + " GiB";
   }
 
+  function formatWordCount(value) {
+    var words = Number(value);
+    if (!Number.isFinite(words) || words <= 0) {
+      return "";
+    }
+    if (words >= 10000) {
+      return (words / 10000).toFixed(1).replace(/\.0$/, "") + " 万字";
+    }
+    return Math.round(words) + " 字";
+  }
+
+  function readingMeta(minutes, words) {
+    var count = Number(minutes);
+    var wordLabel = formatWordCount(words);
+    var minuteLabel = "";
+    if (Number.isFinite(count) && count > 0) {
+      minuteLabel = "约 " + Math.round(count) + " 分钟";
+    }
+    if (minuteLabel && wordLabel) {
+      return minuteLabel + " · " + wordLabel;
+    }
+    return minuteLabel || wordLabel;
+  }
+
+  function readingProgress(scrollTop, scrollHeight, clientHeight) {
+    var top = Number(scrollTop);
+    var height = Number(scrollHeight);
+    var viewport = Number(clientHeight);
+    if (
+      !Number.isFinite(top) ||
+      !Number.isFinite(height) ||
+      !Number.isFinite(viewport) ||
+      height <= 0 ||
+      viewport <= 0
+    ) {
+      return 0;
+    }
+    if (height <= viewport + 1) {
+      return 0;
+    }
+    var ratio = top / (height - viewport);
+    return Math.min(100, Math.max(0, Math.round(ratio * 100)));
+  }
+
+  function adjustFontSize(current, delta, minimum, maximum) {
+    var min = Number.isFinite(Number(minimum)) ? Number(minimum) : 15;
+    var max = Number.isFinite(Number(maximum)) ? Number(maximum) : 24;
+    if (max < min) {
+      var swap = min;
+      min = max;
+      max = swap;
+    }
+    var base = Number(current);
+    if (!Number.isFinite(base) || base <= 0) {
+      base = 17;
+    }
+    var step = Number(delta);
+    if (!Number.isFinite(step)) {
+      step = 0;
+    }
+    return Math.min(max, Math.max(min, Math.round(base + step)));
+  }
+
+  function apiBaseCandidates(pathname) {
+    var path = String(pathname === null || pathname === undefined ? "/" : pathname);
+    if (!path) {
+      path = "/";
+    }
+    var prefixes = ["/v2/proxy/shiye", "/proxy/shiye", "/shiye"];
+    var bases = [];
+    function add(base) {
+      if (base && bases.indexOf(base) === -1) {
+        bases.push(base);
+      }
+    }
+    var matched = "";
+    prefixes.forEach(function (prefix) {
+      if (
+        path === prefix ||
+        path === prefix + "/" ||
+        path.indexOf(prefix + "/") === 0
+      ) {
+        matched = prefix;
+      }
+    });
+    if (matched) {
+      add(matched + "/api/");
+    } else {
+      var directory = path;
+      if (directory.charAt(directory.length - 1) !== "/") {
+        directory = directory.slice(0, directory.lastIndexOf("/") + 1);
+      }
+      if (!directory) {
+        directory = "/";
+      }
+      add(directory + "api/");
+    }
+    prefixes.forEach(function (prefix) {
+      add(prefix + "/api/");
+    });
+    return bases;
+  }
+
   function debounce(fn, wait) {
     var timer = null;
     return function debounced() {
@@ -221,6 +327,11 @@
     nextArticleId: nextArticleId,
     scopeLabel: scopeLabel,
     formatBytes: formatBytes,
+    formatWordCount: formatWordCount,
+    readingMeta: readingMeta,
+    readingProgress: readingProgress,
+    adjustFontSize: adjustFontSize,
+    apiBaseCandidates: apiBaseCandidates,
     debounce: debounce,
   };
 });

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 import sys
 import tempfile
 import unittest
@@ -341,6 +342,127 @@ class StatsTests(StoreTestCase):
         self.assertEqual(stats["unread"], 2)
         self.assertEqual(stats["starred"], 0)
         self.assertGreater(stats["database_bytes"], 0)
+
+
+class MigrationTests(unittest.TestCase):
+    def test_v1_database_is_migrated_in_place(self) -> None:
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        path = str(Path(temp.name) / "v1.db")
+        connection = sqlite3.connect(path)
+        connection.executescript(
+            """
+            CREATE TABLE categories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                position INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL
+            );
+            CREATE TABLE feeds (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                category_id INTEGER,
+                title TEXT NOT NULL,
+                url TEXT NOT NULL UNIQUE,
+                site_url TEXT NOT NULL DEFAULT '',
+                description TEXT NOT NULL DEFAULT '',
+                icon_url TEXT NOT NULL DEFAULT '',
+                etag TEXT NOT NULL DEFAULT '',
+                last_modified TEXT NOT NULL DEFAULT '',
+                last_fetch_at TEXT,
+                last_success_at TEXT,
+                next_fetch_at TEXT,
+                error_count INTEGER NOT NULL DEFAULT 0,
+                last_error TEXT NOT NULL DEFAULT '',
+                disabled INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE TABLE articles (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                feed_id INTEGER NOT NULL,
+                guid TEXT NOT NULL,
+                url TEXT NOT NULL DEFAULT '',
+                title TEXT NOT NULL,
+                author TEXT NOT NULL DEFAULT '',
+                summary TEXT NOT NULL DEFAULT '',
+                content TEXT NOT NULL DEFAULT '',
+                published_at TEXT NOT NULL,
+                fetched_at TEXT NOT NULL,
+                is_read INTEGER NOT NULL DEFAULT 0,
+                is_starred INTEGER NOT NULL DEFAULT 0,
+                search_text TEXT NOT NULL DEFAULT '',
+                UNIQUE(feed_id, guid)
+            );
+            CREATE TABLE settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
+            INSERT INTO feeds (
+                title, url, created_at, updated_at
+            ) VALUES ('老订阅', 'https://old.example/feed', '2025-01-01T00:00:00Z',
+                      '2025-01-01T00:00:00Z');
+            INSERT INTO articles (
+                feed_id, guid, title, published_at, fetched_at
+            ) VALUES (1, 'old-1', '旧文章', '2025-01-01T00:00:00Z',
+                      '2025-01-01T00:00:00Z');
+            PRAGMA user_version=1;
+            """
+        )
+        connection.commit()
+        connection.close()
+
+        store = Store(path)
+        self.addCleanup(store.close)
+        version = store._connection.execute("PRAGMA user_version").fetchone()[0]
+        self.assertEqual(version, 2)
+        feed = store.get_feed(1)
+        self.assertEqual(feed["title"], "老订阅")
+        self.assertEqual(feed["kind"], "rss")
+        article = store.get_article(1)
+        self.assertEqual(article["title"], "旧文章")
+        self.assertEqual(article["site_name"], "")
+        self.assertEqual(article["word_count"], 0)
+        self.assertEqual(article["feed_kind"], "rss")
+
+
+class SavedFeedTests(StoreTestCase):
+    def test_saved_feed_is_idempotent_and_hidden(self) -> None:
+        first = self.store.ensure_saved_feed()
+        second = self.store.ensure_saved_feed()
+        self.assertEqual(first["id"], second["id"])
+        self.assertEqual(first["kind"], "saved")
+        self.assertEqual(self.store.list_feeds(), [])
+        self.assertEqual(self.store.count_feeds(), 0)
+        self.assertEqual(self.store.due_feeds(iso_after(minutes=10000)), [])
+        self.assertEqual(self.store.stats()["feeds"], 0)
+
+        saved_id = int(first["id"])
+        self.store.upsert_articles(
+            saved_id,
+            [
+                {
+                    "guid": "saved:one",
+                    "url": "https://example.com/saved",
+                    "title": "稍后读文章",
+                    "published_at": "2020-01-01T00:00:00Z",
+                    "content": "<p>正文</p>",
+                    "word_count": 12,
+                    "reading_minutes": 1,
+                }
+            ],
+        )
+        article = self.store.find_saved_article("https://example.com/saved")
+        self.assertIsNotNone(article)
+        self.assertEqual(article["feed_kind"], "saved")
+        self.assertEqual(self.store.list_articles()["total"], 1)
+        self.assertEqual(self.store.list_articles(saved_only=True)["total"], 1)
+        self.assertEqual(self.store.stats()["saved"], 1)
+
+        self.store.mark_all_read(saved_only=True)
+        self.assertEqual(self.store.prune(1, 1), 0)
+        self.assertIsNotNone(self.store.find_saved_article("https://example.com/saved"))
+        self.store.delete_article(int(article["id"]))
+        self.assertIsNone(self.store.find_saved_article("https://example.com/saved"))
 
 
 if __name__ == "__main__":

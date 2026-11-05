@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 import threading
@@ -21,9 +22,12 @@ from .feeds import (
     build_opml,
     fetch_feed,
     fetch_image,
-    parse_opml,
+    fetch_page,
     normalize_feed_url,
+    normalize_page_url,
+    parse_opml,
 )
+from .readable import ReadableError, extract_article, text_stats
 from .sanitize import html_to_text, sanitize_fragment, summarize_html
 from .store import Store, StoreError
 from .util import clamp_int, clean_text, iso_after, parse_iso, utc_now
@@ -51,6 +55,7 @@ class AppService:
         self.frontend_dir = frontend_dir
         os.makedirs(data_dir, exist_ok=True)
         self.store = Store(os.path.join(data_dir, "shiye.db"))
+        self.store.ensure_saved_feed()
         self._stop = threading.Event()
         self._scheduler: threading.Thread | None = None
         self._executor: ThreadPoolExecutor | None = None
@@ -259,6 +264,8 @@ class AppService:
                 if published_dt > limit_dt:
                     published = now
             title = clean_text(entry.title, 500) or "(无标题)"
+            plain = html_to_text(content, limit=120_000) if content else ""
+            word_count, reading_minutes = text_stats(plain)
             entries.append(
                 {
                     "guid": entry.guid,
@@ -267,6 +274,12 @@ class AppService:
                     "author": clean_text(entry.author, 200),
                     "summary": summary,
                     "content": content,
+                    "site_name": clean_text(
+                        feed.get("title") or self._hostname(entry.url or feed_url),
+                        200,
+                    ),
+                    "word_count": word_count,
+                    "reading_minutes": reading_minutes,
                     "published_at": published,
                 }
             )
@@ -300,6 +313,8 @@ class AppService:
         feed = self.store.get_feed(feed_id)
         if feed is None:
             raise ServiceError("订阅不存在", "feed_not_found", 404)
+        if feed.get("kind") == "saved":
+            raise ServiceError("稍后读是内置列表，不需要刷新", "saved_feed", 409)
         if feed["disabled"]:
             raise ServiceError("该订阅已暂停", "feed_disabled", 409)
         with self._active_lock:
@@ -412,6 +427,155 @@ class AppService:
             LOGGER.info("pruned %s old articles", deleted)
         return deleted
 
+    # ------------------------------------------------------------------- read later
+
+    def _saved_feed_id(self) -> int:
+        feed = self.store.ensure_saved_feed()
+        feed_id = int(feed["id"])
+        return feed_id
+
+    @staticmethod
+    def _saved_guid(url: str) -> str:
+        digest = hashlib.sha1(url.encode("utf-8", "replace")).hexdigest()
+        return "saved:" + digest
+
+    def _link_only_entry(self, url: str, title: Any = "") -> dict[str, Any]:
+        cleaned_title = clean_text(title, 500) or self._hostname(url)
+        return {
+            "guid": self._saved_guid(url),
+            "url": url,
+            "title": cleaned_title,
+            "author": "",
+            "summary": "链接已保存，打开时可以重新提取正文。",
+            "content": "",
+            "site_name": self._hostname(url),
+            "word_count": 0,
+            "reading_minutes": 0,
+            "published_at": utc_now(),
+        }
+
+    def save_article(
+        self,
+        raw_url: Any,
+        *,
+        fallback: bool = False,
+        title: Any = "",
+    ) -> dict[str, Any]:
+        try:
+            requested = normalize_page_url(raw_url)
+        except FeedError as exc:
+            raise ServiceError(exc.message, exc.code, 400) from exc
+
+        existing = self.store.find_saved_article(requested)
+        if fallback:
+            if existing is not None:
+                return {
+                    "article": existing,
+                    "created": False,
+                    "extracted": bool(existing.get("content")),
+                }
+            entry = self._link_only_entry(requested, title)
+            self.store.upsert_articles(self._saved_feed_id(), [entry])
+            article = self.store.find_saved_article(requested)
+            if article is None:
+                raise ServiceError("文章保存失败", "save_failed", 500)
+            return {"article": article, "created": True, "extracted": False}
+
+        if existing is not None and existing.get("content"):
+            return {
+                "article": existing,
+                "created": False,
+                "extracted": True,
+            }
+
+        try:
+            result, page = fetch_page(requested)
+            readable = extract_article(page, result.final_url)
+        except FeedError as exc:
+            raise ServiceError(exc.message, exc.code, 422) from exc
+        except ReadableError as exc:
+            raise ServiceError(exc.message, exc.code, 422) from exc
+
+        try:
+            final_url = normalize_page_url(result.final_url)
+        except FeedError:
+            final_url = requested
+        existing = self.store.find_saved_article(final_url)
+        if existing is not None and existing.get("content"):
+            return {
+                "article": existing,
+                "created": False,
+                "extracted": True,
+            }
+
+        entry = {
+            "guid": self._saved_guid(final_url),
+            "url": final_url,
+            "title": clean_text(readable.title, 500) or self._hostname(final_url),
+            "author": clean_text(readable.byline, 200),
+            "summary": clean_text(readable.excerpt, 600),
+            "content": readable.content_html,
+            "site_name": clean_text(
+                readable.site_name or self._hostname(final_url), 200
+            ),
+            "word_count": readable.word_count,
+            "reading_minutes": readable.reading_minutes,
+            "published_at": utc_now(),
+        }
+        self.store.upsert_articles(self._saved_feed_id(), [entry])
+        article = self.store.find_saved_article(final_url) or self.store.find_saved_article(
+            requested
+        )
+        if article is None:
+            raise ServiceError("文章保存失败", "save_failed", 500)
+        return {
+            "article": article,
+            "created": existing is None,
+            "extracted": True,
+        }
+
+    def reload_saved_content(self, article_id: int) -> dict[str, Any]:
+        article = self.get_article(article_id)
+        if article.get("feed_kind") != "saved":
+            raise ServiceError(
+                "只有稍后读文章可以重新提取正文", "not_saved", 409
+            )
+        url = self._http_url(article.get("url"))
+        if not url:
+            raise ServiceError("这条记录没有可访问的原文链接", "invalid_url", 422)
+        try:
+            result, page = fetch_page(url)
+            readable = extract_article(page, result.final_url)
+        except FeedError as exc:
+            raise ServiceError(exc.message, exc.code, 422) from exc
+        except ReadableError as exc:
+            raise ServiceError(exc.message, exc.code, 422) from exc
+        self.store.update_article_content(
+            article_id,
+            title=clean_text(readable.title, 500) or article["title"],
+            author=clean_text(readable.byline, 200),
+            summary=clean_text(readable.excerpt, 600),
+            content=readable.content_html,
+            site_name=clean_text(
+                readable.site_name or self._hostname(result.final_url), 200
+            ),
+            word_count=readable.word_count,
+            reading_minutes=readable.reading_minutes,
+        )
+        return self.get_article(article_id)
+
+    def delete_article(self, article_id: int) -> dict[str, Any]:
+        article = self.get_article(article_id)
+        if article.get("feed_kind") != "saved":
+            raise ServiceError(
+                "只能移除稍后读里的文章；订阅文章请清理订阅源",
+                "not_saved",
+                409,
+            )
+        self.store.delete_article(article_id)
+        stats = self.store.stats()
+        return {"deleted": True, "saved": stats["saved"], "unread": stats["unread"]}
+
     # ----------------------------------------------------------------------- reading
 
     def list_articles(
@@ -421,6 +585,7 @@ class AppService:
         category_id: Any = None,
         unread_only: bool = False,
         starred_only: bool = False,
+        saved_only: bool = False,
         search: Any = "",
         limit: Any = 30,
         offset: Any = 0,
@@ -428,13 +593,17 @@ class AppService:
         parsed_feed_id = self._optional_id(feed_id, "订阅")
         parsed_category_id = self._optional_id(category_id, "分类")
         text = clean_text(search, MAX_SEARCH_CHARS)
-        if parsed_feed_id is not None:
+        if saved_only:
+            parsed_feed_id = None
+            parsed_category_id = None
+        elif parsed_feed_id is not None:
             parsed_category_id = None
         return self.store.list_articles(
             feed_id=parsed_feed_id,
             category_id=parsed_category_id,
             unread_only=bool(unread_only),
             starred_only=bool(starred_only),
+            saved_only=bool(saved_only),
             search=text,
             limit=clamp_int(limit, 30, 1, 100),
             offset=clamp_int(offset, 0, 0, 1_000_000),
@@ -470,14 +639,23 @@ class AppService:
         return {"article": article, "starred": stats["starred"]}
 
     def mark_all_read(
-        self, *, feed_id: Any = None, category_id: Any = None
+        self,
+        *,
+        feed_id: Any = None,
+        category_id: Any = None,
+        saved_only: bool = False,
     ) -> dict[str, Any]:
         parsed_feed_id = self._optional_id(feed_id, "订阅")
         parsed_category_id = self._optional_id(category_id, "分类")
-        if parsed_feed_id is not None:
+        if saved_only:
+            parsed_feed_id = None
+            parsed_category_id = None
+        elif parsed_feed_id is not None:
             parsed_category_id = None
         changed = self.store.mark_all_read(
-            feed_id=parsed_feed_id, category_id=parsed_category_id
+            feed_id=parsed_feed_id,
+            category_id=parsed_category_id,
+            saved_only=bool(saved_only),
         )
         return {"changed": changed, "unread": self.store.stats()["unread"]}
 
@@ -506,13 +684,19 @@ class AppService:
         return self.store.list_feeds()
 
     def delete_feed(self, feed_id: int) -> None:
-        if not self.store.delete_feed(feed_id):
+        feed = self.store.get_feed(feed_id)
+        if feed is None:
             raise ServiceError("订阅不存在", "feed_not_found", 404)
+        if feed.get("kind") == "saved":
+            raise ServiceError("稍后读是内置列表，不能删除", "saved_feed", 409)
+        self.store.delete_feed(feed_id)
 
     def update_feed(self, feed_id: int, fields: dict[str, Any]) -> dict[str, Any]:
         feed = self.store.get_feed(feed_id)
         if feed is None:
             raise ServiceError("订阅不存在", "feed_not_found", 404)
+        if feed.get("kind") == "saved":
+            raise ServiceError("稍后读是内置列表，不能修改", "saved_feed", 409)
         if "category_id" in fields:
             category_id = fields.get("category_id")
             if category_id in (None, "", 0, "0"):
@@ -666,6 +850,7 @@ class AppService:
             "status": "ok",
             "feeds": stats["feeds"],
             "articles": stats["articles"],
+            "saved": stats["saved"],
             "unread": stats["unread"],
             "refresh_interval": settings["refresh_interval"],
         }

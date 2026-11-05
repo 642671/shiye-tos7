@@ -1,6 +1,6 @@
 # 架构说明
 
-拾页是一个单进程、单用户的本地 RSS 阅读器。它刻意保持小：一个 Python 服务、一个 SQLite 文件、一组静态前端资源，没有消息队列、缓存中间件或前端构建链。
+拾页是一个单进程、单用户的本地阅读收件箱。它刻意保持小：一个 Python 服务、一个 SQLite 文件、一组静态前端资源，没有消息队列、缓存中间件或前端构建链。订阅文章和手动保存的网页链接共享同一套文章模型。
 
 ## 运行时拓扑
 
@@ -19,6 +19,7 @@ systemd: shiye-system.service
        ├─ AppService（业务编排、调度器、线程池）
        ├─ Store（SQLite + WAL）
        ├─ feeds.py（HTTP 抓取 + 解析）
+       ├─ readable.py（保存链接的正文提取）
        └─ sanitize.py（HTML 清洗）
         │
         ▼
@@ -44,10 +45,12 @@ systemd: shiye-system.service
 | POST | `/api/feeds` | 添加订阅（支持 URL 自动发现和分类） |
 | GET / PATCH / DELETE | `/api/feeds/{id}` | 查看、修改、删除订阅 |
 | POST | `/api/feeds/{id}/refresh` | 立即刷新单个订阅 |
-| GET | `/api/articles` | 文章列表，支持 `feed_id`、`category_id`、`unread`、`starred`、`q`、`limit`、`offset` |
-| GET | `/api/articles/{id}` | 文章正文 |
+| GET | `/api/articles` | 文章列表，支持 `feed_id`、`category_id`、`unread`、`starred`、`saved`、`q`、`limit`、`offset` |
+| GET / DELETE | `/api/articles/{id}` | 文章正文 / 移出稍后读（仅保存的文章） |
 | POST | `/api/articles/{id}/read` | 设置已读状态 |
 | POST | `/api/articles/{id}/star` | 切换或设置星标 |
+| POST | `/api/articles/{id}/extract` | 重新抓取并提取已保存文章的正文 |
+| POST | `/api/saved` | 保存任意网页链接；`fallback=true` 时只保存链接 |
 | POST | `/api/articles/mark-read` | 批量设置已读 |
 | POST | `/api/articles/mark-all-read` | 按订阅/分类全部已读 |
 | GET / POST | `/api/categories` | 分类列表 / 创建 |
@@ -62,7 +65,7 @@ systemd: shiye-system.service
 
 ## 数据模型
 
-SQLite 使用 WAL、`synchronous=NORMAL`、外键约束和 10 秒 busy timeout。`PRAGMA user_version` 记录 schema 版本，当前为 1。
+SQLite 使用 WAL、`synchronous=NORMAL`、外键约束和 10 秒 busy timeout。`PRAGMA user_version` 记录 schema 版本，当前为 2。旧版数据库启动时自动补充 `feeds.kind`、`articles.site_name`、`articles.word_count` 和 `articles.reading_minutes`，无需重建。
 
 ### `categories`
 
@@ -70,11 +73,13 @@ SQLite 使用 WAL、`synchronous=NORMAL`、外键约束和 10 秒 busy timeout�
 
 ### `feeds`
 
-订阅源元数据和抓取状态：`url`（唯一）、`title`、`site_url`、`description`、`icon_url`、条件请求字段 `etag` / `last_modified`、`last_fetch_at`、`last_success_at`、`next_fetch_at`、`error_count`、`last_error`、`disabled`。分类删除时 `category_id` 置空。
+订阅源元数据和抓取状态：`url`（唯一）、`title`、`site_url`、`description`、`icon_url`、`kind`（`rss` / `saved`）、条件请求字段 `etag` / `last_modified`、`last_fetch_at`、`last_success_at`、`next_fetch_at`、`error_count`、`last_error`、`disabled`。分类删除时 `category_id` 置空。
+
+`kind='saved'` 是一个隐藏的内置来源（`shiye:saved`，标题「稍后读」），不对用户展示，也不参与定时抓取。把保存链接放进同一条 `articles` 路径，避免 `feed_id` 可空带来的筛选、搜索和清理分支；删除稍后读文章时只删除该文章本身。
 
 ### `articles`
 
-`UNIQUE(feed_id, guid)` 保证重复抓取幂等。除正文外保存 `summary`（纯文本摘要）、`published_at`、`fetched_at`、`is_read`、`is_starred`，以及用于搜索的 `search_text`（标题、作者、摘要、正文转小写后的拼接）。删除订阅级联删除文章。
+`UNIQUE(feed_id, guid)` 保证重复抓取幂等。除正文外保存 `summary`（纯文本摘要）、`site_name`、`word_count`、`reading_minutes`、`published_at`、`fetched_at`、`is_read`、`is_starred`，以及用于搜索的 `search_text`（标题、作者、摘要、正文转小写后的拼接）。删除订阅级联删除文章。
 
 ### `settings`
 
@@ -93,6 +98,18 @@ SQLite 使用 WAL、`synchronous=NORMAL`、外键约束和 10 秒 busy timeout�
 7. `parse_opml` / `build_opml`：OPML 2.0 双向转换。
 
 日期解析同时支持 RFC 822 和 ISO 8601；未来时间会被钳制到当前时间，避免订阅源错误日期把文章顶到列表顶部。
+
+## 保存链接与正文提取
+
+`POST /api/saved` 是保存链接的唯一入口，流程如下：
+
+1. `normalize_page_url` 只接受 http/https；已有同 URL 且带正文的稍后读文章直接返回，不重复抓取。
+2. 普通模式调用 `fetch_page` 抓取原页面，`readable.extract_article` 在标准库 DOM 树上按容器文本量、链接密度、段落比例等打分，选出正文容器。
+3. 提取标题、作者、站点名、摘要和正文；支持 JSON-LD `Article` 元数据、`og:` / `name="author"` 回退、懒加载图片属性提升，并去掉与标题重复的首个标题。
+4. 正文交给 `sanitize_fragment` 清洗，计算字数与预计阅读时间，写入隐藏的稍后读来源。
+5. `fallback=true` 或提取失败时，保存标题、URL 和摘要的“仅链接”记录；之后可在阅读区调用 `POST /api/articles/{id}/extract` 重新提取。
+
+提取器不执行 JavaScript，也不绕过登录或付费墙。页面依赖前端渲染时，通常只能得到标题、摘要或仅链接记录。抓取沿用 `fetch_page` 的超时、体积、重定向和内容类型限制。
 
 ## 内容清洗
 
@@ -122,11 +139,13 @@ SQLite 使用 WAL、`synchronous=NORMAL`、外键约束和 10 秒 busy timeout�
 `app.js` 是唯一的状态所有者：
 
 - `Api` 客户端自动探测代理前缀，统一处理 JSON、错误和网络失败。
-- `state` 保存当前视图、文章列表、选中项、订阅和分类。
+- `state` 保存当前视图、文章列表、选中项、订阅和分类；`saved` 是独立的筛选类型。
 - 侧栏、列表、阅读区分别由 `renderSidebar` / `renderArticleList` / `renderReader` 重建。
 - 所有用户可见文本通过 `textContent` 写入；只有已清洗正文进入阅读区。
+- 保存链接对话框有三种结果：提取并保存、仅保存链接、已存在；阅读区对“仅链接”和“只有摘要”分别给出上下文操作。
+- 主题在 `theme.js` 中最早执行，避免首屏闪烁；主题按钮在浅色/深色间直接切换，设置页仍可选“跟随系统”。
+- 阅读进度按 `scrollTop / (scrollHeight - clientHeight)` 计算，正文字号写入根元素 CSS 变量，两者都保存在本地。
 - `tools.js` 以 UMD 形式暴露纯函数，便于 Node 直接测试。
-- 主题在 `theme.js` 中最早执行，避免首屏闪烁。
 - 窄屏（≤980px）切换抽屉侧栏，阅读时使用全屏 overlay。
 
 ## 打包
@@ -150,7 +169,8 @@ SQLite 使用 WAL、`synchronous=NORMAL`、外键约束和 10 秒 busy timeout�
 
 ## 测试策略
 
-- 后端单元测试用 mock 替换网络，覆盖解析、清洗、存储、服务、路由和契约。
+- 后端单元测试用 mock 替换网络，覆盖解析、正文提取、清洗、存储、服务、路由和契约。
 - 前端纯函数用 `node:test` 覆盖。
 - 打包契约测试同时检查静态文件、语言文件、生命周期脚本和 systemd 单元。
+- 发布前用本地 TCP 实例和 Playwright 做桌面/移动端冒烟检查，覆盖保存链接、仅链接提示、主题切换和空状态；截图不写入数据库或真实站点。
 - 不依赖真实 TOS 设备的测试必须在 Windows/Linux 上都能跑；Unix socket 相关代码做了平台保护。

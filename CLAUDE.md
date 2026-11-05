@@ -4,7 +4,7 @@
 
 ## 项目定位
 
-拾页是 TOS 7 的 iframe Deb 应用：
+拾页是 TOS 7 的 iframe Deb 应用，定位为「阅读收件箱」：订阅 RSS / Atom，也保存任意网页链接稍后阅读。
 
 - 后端：Python 3.10+ 标准库，运行在 TOS 内置 Python 上。
 - 前端：原生 HTML/CSS/JavaScript，无构建链、无框架、无 CDN。
@@ -34,6 +34,7 @@ python build.py --platform aarch64
 | 路径 | 职责 |
 | --- | --- |
 | `backend/shiye/feeds.py` | URL 规范化、抓取、编码识别、RSS/RDF/Atom 解析、OPML |
+| `backend/shiye/readable.py` | 保存链接的正文提取、元数据与字数统计 |
 | `backend/shiye/sanitize.py` | HTML 白名单清洗、跟踪参数、图片代理、纯文本提取 |
 | `backend/shiye/store.py` | SQLite schema、CRUD、筛选、搜索、清理、设置钳制 |
 | `backend/shiye/service.py` | 业务编排、调度器、线程池、错误映射 |

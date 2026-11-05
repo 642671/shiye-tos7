@@ -1,97 +1,97 @@
 [zh-cn]
 name = "拾页"
 auth = "Yuii"
-descript = "原生运行在 TOS 7 上的 RSS 与 Atom 阅读器，支持分类、搜索、已读与星标、OPML 导入导出和定时抓取，文章数据只保存在本机。"
-release_note = "0.1.0：首个版本，支持 RSS 2.0、RSS 1.0 与 Atom、分类管理、全文搜索、已读与星标、OPML 导入导出、后台定时刷新以及深浅色主题。"
+descript = "原生运行在 TOS 7 上的阅读收件箱：订阅 RSS、Atom，或把任意网页收进稍后读；支持正文提取、分类、搜索、已读与星标、OPML 迁移和定时抓取，数据只保存在本机。"
+release_note = "0.2.0：全新阅读收件箱。新增「收进稍后读」，可保存任意网页并提取干净正文；重新设计三栏界面、正文阅读进度与字号调节，补齐原文回退和缺失文章的处理，并更换应用图标。"
 important = "订阅由 NAS 直接抓取，文章保存在应用数据目录，不经过第三方服务。远程图片会通过本机代理加载以便去除跟踪参数。"
 
 [zh-hk]
 name = "拾頁"
 auth = "Yuii"
-descript = "原生運行於 TOS 7 的 RSS 與 Atom 閱讀器，支援分類、搜尋、已讀與星標、OPML 匯入匯出及定時抓取，文章資料只保存在本機。"
-release_note = "0.1.0：首個版本，支援 RSS 2.0、RSS 1.0 與 Atom、分類管理、全文搜尋、已讀與星標、OPML 匯入匯出、背景定時刷新以及深淺色主題。"
+descript = "原生運行於 TOS 7 的閱讀收件箱：訂閱 RSS、Atom，或把任何網頁收進稍後讀；支援正文擷取、分類、搜尋、已讀與星標、OPML 匯入匯出及定時抓取，資料只保存在本機。"
+release_note = "0.2.0：全新閱讀收件箱。新增「收進稍後讀」，可保存任何網頁並擷取乾淨正文；重新設計三欄介面、正文閱讀進度與字級調節，補齊原文回退和缺失文章的處理，並更換應用圖示。"
 important = "訂閱由 NAS 直接抓取，文章保存在應用資料目錄，不經過第三方服務。遠端圖片會透過本機代理載入以移除追蹤參數。"
 
 [en-us]
 name = "Shiye"
 auth = "Yuii"
-descript = "A native RSS and Atom reader for TOS 7 with categories, search, read and starred states, OPML import and export, and scheduled fetching. Articles stay on your NAS."
-release_note = "0.1.0: first release with RSS 2.0, RSS 1.0 and Atom support, categories, full-text search, read and starred states, OPML import and export, scheduled refresh, and light and dark themes."
+descript = "A reading inbox for TOS 7. Subscribe to RSS and Atom, or save any web page for later; Shiye extracts clean article text and keeps categories, search, read and starred states, OPML migration, and scheduled fetching on your NAS."
+release_note = "0.2.0: a redesigned reading inbox. Save any web page to Read Later with clean text extraction, a warmer three-pane interface, reading progress and font controls, graceful recovery for link-only or missing articles, and a new app icon."
 important = "Feeds are fetched directly by the NAS and articles are stored in the app data directory, never routed through a third-party service. Remote images load through a local proxy so tracking parameters can be removed."
 
 [fr-fr]
 name = "Shiye"
 auth = "Yuii"
-descript = "Un lecteur RSS et Atom natif pour TOS 7 avec catégories, recherche, états lu et favori, import et export OPML, et actualisation planifiée. Les articles restent sur votre NAS."
-release_note = "0.1.0 : première version avec prise en charge de RSS 2.0, RSS 1.0 et Atom, catégories, recherche plein texte, états lu et favori, import et export OPML, actualisation planifiée et thèmes clair et sombre."
+descript = "Une boîte de lecture native pour TOS 7. Abonnez-vous à des flux RSS et Atom ou enregistrez n'importe quelle page pour plus tard ; Shiye extrait le texte propre et conserve catégories, recherche, états lu et favori, migration OPML et actualisation planifiée sur votre NAS."
+release_note = "0.2.0 : refonte en boîte de lecture. Enregistrez n'importe quelle page dans « À lire plus tard » avec extraction du texte, nouvelle interface à trois volets, progression de lecture et réglage de la taille du texte, meilleure récupération des articles sans contenu ou disparus, et nouvelle icône."
 important = "Les flux sont récupérés directement par le NAS et les articles sont stockés dans le dossier de données de l'application, sans passer par un service tiers. Les images distantes passent par un proxy local afin de supprimer les paramètres de suivi."
 
 [de-de]
 name = "Shiye"
 auth = "Yuii"
-descript = "Ein nativer RSS- und Atom-Reader für TOS 7 mit Kategorien, Suche, Gelesen- und Favoritenstatus, OPML-Import und -Export sowie geplantem Abruf. Artikel bleiben auf dem NAS."
-release_note = "0.1.0: Erste Version mit Unterstützung für RSS 2.0, RSS 1.0 und Atom, Kategorien, Volltextsuche, Gelesen- und Favoritenstatus, OPML-Import und -Export, geplantem Aktualisieren sowie hellem und dunklem Design."
+descript = "Ein Lese-Posteingang für TOS 7. Abonniere RSS und Atom oder speichere beliebige Webseiten für später; Shiye extrahiert sauberen Text und behält Kategorien, Suche, Gelesen- und Favoritenstatus, OPML-Migration und geplantes Abrufen auf deinem NAS."
+release_note = "0.2.0: überarbeiteter Lese-Posteingang. Beliebige Webseiten mit sauberer Textextraktion unter „Später lesen“ speichern, wärmeres Drei-Spalten-Layout, Lesefortschritt und Schriftgröße, bessere Behandlung von Link-only- oder fehlenden Artikeln und ein neues App-Symbol."
 important = "Feeds werden direkt vom NAS abgerufen und Artikel im Datenverzeichnis der App gespeichert, ohne Umweg über einen Drittanbieter. Remote-Bilder werden über einen lokalen Proxy geladen, damit Tracking-Parameter entfernt werden können."
 
 [it-it]
 name = "Shiye"
 auth = "Yuii"
-descript = "Un lettore RSS e Atom nativo per TOS 7 con categorie, ricerca, stati letto e preferito, importazione ed esportazione OPML e aggiornamento pianificato. Gli articoli restano sul NAS."
-release_note = "0.1.0: prima versione con supporto a RSS 2.0, RSS 1.0 e Atom, categorie, ricerca full-text, stati letto e preferito, importazione ed esportazione OPML, aggiornamento pianificato e temi chiaro e scuro."
+descript = "Una casella di lettura nativa per TOS 7. Iscriviti a feed RSS e Atom o salva qualsiasi pagina per dopo; Shiye estrae il testo pulito e mantiene categorie, ricerca, stati letto e preferito, migrazione OPML e aggiornamento pianificato sul tuo NAS."
+release_note = "0.2.0: casella di lettura ridisegnata. Salva qualsiasi pagina in «Leggi dopo» con estrazione del testo, nuova interfaccia a tre pannelli, avanzamento di lettura e dimensione del testo, migliore gestione degli articoli senza contenuto o rimossi e nuova icona."
 important = "I feed vengono scaricati direttamente dal NAS e gli articoli sono salvati nella cartella dati dell'app, senza servizi di terze parti. Le immagini remote passano da un proxy locale per rimuovere i parametri di tracciamento."
 
 [es-es]
 name = "Shiye"
 auth = "Yuii"
-descript = "Un lector RSS y Atom nativo para TOS 7 con categorías, búsqueda, estados leído y favorito, importación y exportación OPML y actualización programada. Los artículos permanecen en tu NAS."
-release_note = "0.1.0: primera versión con soporte para RSS 2.0, RSS 1.0 y Atom, categorías, búsqueda de texto completo, estados leído y favorito, importación y exportación OPML, actualización programada y temas claro y oscuro."
+descript = "Una bandeja de lectura nativa para TOS 7. Suscríbete a RSS y Atom o guarda cualquier página para después; Shiye extrae el texto limpio y mantiene categorías, búsqueda, estados leído y favorito, migración OPML y actualización programada en tu NAS."
+release_note = "0.2.0: bandeja de lectura rediseñada. Guarda cualquier página en «Leer más tarde» con extracción de texto, nueva interfaz de tres paneles, progreso de lectura y tamaño de texto, mejor recuperación de artículos sin contenido o eliminados y nuevo icono."
 important = "El NAS obtiene los feeds directamente y los artículos se guardan en el directorio de datos de la aplicación, sin pasar por servicios de terceros. Las imágenes remotas se cargan mediante un proxy local para eliminar los parámetros de seguimiento."
 
 [hu-hu]
 name = "Shiye"
 auth = "Yuii"
-descript = "Natív RSS- és Atom-olvasó TOS 7-hez kategóriákkal, kereséssel, olvasott és csillagozott állapottal, OPML-importtal és -exporttal, valamint ütemezett frissítéssel. A cikkek a NAS-on maradnak."
-release_note = "0.1.0: első kiadás RSS 2.0, RSS 1.0 és Atom támogatással, kategóriákkal, teljes szöveges kereséssel, olvasott és csillagozott állapottal, OPML-importtal és -exporttal, ütemezett frissítéssel, valamint világos és sötét témával."
+descript = "Natív olvasópostafiók TOS 7-hez. Iratkozz fel RSS- és Atom-hírcsatornákra, vagy ments el bármilyen weboldalt későbbre; a Shiye tiszta szöveget nyer ki, és a NAS-on tartja a kategóriákat, keresést, olvasott és csillagozott állapotot, OPML-migrációt és ütemezett frissítést."
+release_note = "0.2.0: újratervezett olvasópostafiók. Bármilyen weboldal mentése „Később olvasom” alá tiszta szövegkinyeréssel, melegebb hárompaneles felület, olvasási folyamat és betűméret, jobb kezelés a tartalom nélküli vagy eltűnt cikkeknél, valamint új alkalmazásikon."
 important = "A hírcsatornákat a NAS tölti le, a cikkek az alkalmazás adatkönyvtárában tárolódnak, harmadik fél szolgáltatás nélkül. A távoli képek helyi proxyn keresztül töltődnek be, hogy a követési paraméterek eltávolíthatók legyenek."
 
 [ja-jp]
 name = "Shiye"
 auth = "Yuii"
-descript = "TOS 7 向けのネイティブ RSS / Atom リーダー。カテゴリ、検索、既読・スター、OPML のインポートとエクスポート、定期取得に対応し、記事は NAS 上に保存されます。"
-release_note = "0.1.0：初回リリース。RSS 2.0、RSS 1.0、Atom に対応し、カテゴリ管理、全文検索、既読・スター、OPML のインポートとエクスポート、バックグラウンド定期更新、ライト・ダークテーマを搭載。"
+descript = "TOS 7 向けのネイティブな読書インボックス。RSS / Atom を購読するか、任意の Web ページを「あとで読む」に保存。本文抽出、カテゴリ、検索、既読・スター、OPML 移行、定期取得に対応し、データは NAS 上に保存されます。"
+release_note = "0.2.0：読書インボックスとして刷新。「あとで読む」で任意の Web ページを保存して本文を抽出、温かみのある三ペイン画面、読書進捗と文字サイズ調整、リンクのみ・見つからない記事の改善された扱い、新しいアプリアイコンを追加。"
 important = "フィードは NAS が直接取得し、記事はアプリのデータディレクトリに保存されます。第三者サービスは経由しません。リモート画像はローカルプロキシ経由で読み込み、追跡パラメータを除去します。"
 
 [ko-kr]
 name = "Shiye"
 auth = "Yuii"
-descript = "TOS 7용 네이티브 RSS 및 Atom 리더입니다. 카테고리, 검색, 읽음 및 별표 상태, OPML 가져오기와 내보내기, 예약 새로고침을 지원하며 기사는 NAS에 보관됩니다."
-release_note = "0.1.0: 첫 릴리스. RSS 2.0, RSS 1.0, Atom 지원, 카테고리 관리, 전체 텍스트 검색, 읽음 및 별표 상태, OPML 가져오기와 내보내기, 백그라운드 예약 새로고침, 라이트 및 다크 테마를 제공합니다."
+descript = "TOS 7용 네이티브 읽기 받은편지함. RSS와 Atom을 구독하거나 어떤 웹 페이지든 나중에 읽기로 저장하세요. Shiye가 깨끗한 본문을 추출하며 카테고리, 검색, 읽음 및 별표, OPML 이전, 예약 새로고침을 NAS에 보관합니다."
+release_note = "0.2.0: 읽기 받은편지함으로 새롭게 디자인. 어떤 웹 페이지든 '나중에 읽기'에 저장하고 본문을 추출하며, 따뜻한 3패널 화면, 읽기 진행률과 글자 크기 조절, 링크만 저장된 글과 사라진 글 처리 개선, 새 앱 아이콘을 제공합니다."
 important = "피드는 NAS가 직접 가져오며 기사는 앱 데이터 디렉터리에 저장되고 제3자 서비스를 거치지 않습니다. 원격 이미지는 로컬 프록시를 통해 불러와 추적 매개변수를 제거합니다."
 
 [pl-pl]
 name = "Shiye"
 auth = "Yuii"
-descript = "Natywny czytnik RSS i Atom dla TOS 7 z kategoriami, wyszukiwaniem, stanami przeczytane i gwiazdka, importem i eksportem OPML oraz zaplanowanym odświeżaniem. Artykuły pozostają na NAS."
-release_note = "0.1.0: pierwsze wydanie z obsługą RSS 2.0, RSS 1.0 i Atom, kategoriami, wyszukiwaniem pełnotekstowym, stanami przeczytane i gwiazdka, importem i eksportem OPML, zaplanowanym odświeżaniem oraz jasnym i ciemnym motywem."
+descript = "Natywna skrzynka czytelnicza dla TOS 7. Subskrybuj RSS i Atom lub zapisuj dowolne strony na później; Shiye wyodrębnia czysty tekst i przechowuje kategorie, wyszukiwanie, stany przeczytane i gwiazdka, migrację OPML oraz zaplanowane odświeżanie na NAS."
+release_note = "0.2.0: przeprojektowana skrzynka czytelnicza. Zapisuj dowolne strony w „Przeczytaj później” z wyodrębnianiem tekstu, cieplejszy trójpanelowy interfejs, postęp czytania i rozmiar tekstu, lepsza obsługa artykułów bez treści lub usuniętych oraz nowa ikona aplikacji."
 important = "Kanały są pobierane bezpośrednio przez NAS, a artykuły zapisywane w katalogu danych aplikacji, bez pośrednictwa usług zewnętrznych. Obrazy zdalne ładują się przez lokalny proxy, aby usuwać parametry śledzące."
 
 [ru-ru]
 name = "Shiye"
 auth = "Yuii"
-descript = "Нативный RSS- и Atom-ридер для TOS 7 с категориями, поиском, состояниями прочитано и избранное, импортом и экспортом OPML и обновлением по расписанию. Статьи остаются на NAS."
-release_note = "0.1.0: первый выпуск с поддержкой RSS 2.0, RSS 1.0 и Atom, категориями, полнотекстовым поиском, состояниями прочитано и избранное, импортом и экспортом OPML, обновлением в фоне, а также светлой и тёмной темами."
+descript = "Нативная читательская папка для TOS 7. Подписывайтесь на RSS и Atom или сохраняйте любые веб-страницы на потом; Shiye извлекает чистый текст и хранит категории, поиск, состояния прочитано и избранное, перенос OPML и обновление по расписанию на вашем NAS."
+release_note = "0.2.0: обновлённая читательская папка. Сохраняйте любые страницы в «Прочитать позже» с извлечением текста, более тёплый трёхпанельный интерфейс, прогресс чтения и размер шрифта, улучшенная обработка статей без содержимого или удалённых, а также новая иконка приложения."
 important = "Ленты загружаются напрямую с NAS, а статьи хранятся в каталоге данных приложения без сторонних сервисов. Удалённые изображения загружаются через локальный прокси, чтобы удалять параметры отслеживания."
 
 [tr-tr]
 name = "Shiye"
 auth = "Yuii"
-descript = "TOS 7 için yerel RSS ve Atom okuyucu; kategoriler, arama, okundu ve yıldızlı durumları, OPML içe ve dışa aktarma ve zamanlanmış yenileme sunar. Makaleler NAS'ta kalır."
-release_note = "0.1.0: RSS 2.0, RSS 1.0 ve Atom desteği, kategoriler, tam metin arama, okundu ve yıldızlı durumları, OPML içe ve dışa aktarma, arka planda zamanlanmış yenileme ile açık ve koyu temalar içeren ilk sürüm."
+descript = "TOS 7 için yerel bir okuma gelen kutusu. RSS ve Atom abonelikleri ekleyin veya herhangi bir web sayfasını sonra okumak üzere kaydedin; Shiye temiz metni çıkarır ve kategorileri, aramayı, okundu ve yıldızlı durumları, OPML taşımayı ve zamanlanmış yenilemeyi NAS'ınızda tutar."
+release_note = "0.2.0: yeniden tasarlanan okuma gelen kutusu. Herhangi bir sayfayı temiz metin çıkarımıyla «Sonra oku»ya kaydedin, daha sıcak üç panelli arayüz, okuma ilerlemesi ve yazı boyutu, yalnızca bağlantı içeren veya kaybolan makaleler için daha iyi kurtarma ve yeni uygulama simgesi."
 important = "Akışlar doğrudan NAS tarafından alınır ve makaleler üçüncü taraf hizmetlerden geçmeden uygulamanın veri dizininde saklanır. Uzak görseller izleme parametrelerini kaldırmak için yerel bir proxy üzerinden yüklenir."
 
 [pt-pt]
 name = "Shiye"
 auth = "Yuii"
-descript = "Um leitor RSS e Atom nativo para TOS 7 com categorias, pesquisa, estados lido e favorito, importação e exportação OPML e atualização agendada. Os artigos ficam no seu NAS."
-release_note = "0.1.0: primeira versão com suporte a RSS 2.0, RSS 1.0 e Atom, categorias, pesquisa de texto completo, estados lido e favorito, importação e exportação OPML, atualização agendada e temas claro e escuro."
+descript = "Uma caixa de leitura nativa para TOS 7. Subscreva RSS e Atom ou guarde qualquer página para mais tarde; o Shiye extrai o texto limpo e mantém categorias, pesquisa, estados lido e favorito, migração OPML e atualização agendada no seu NAS."
+release_note = "0.2.0: caixa de leitura redesenhada. Guarde qualquer página em «Ler mais tarde» com extração de texto, interface de três painéis mais acolhedora, progresso de leitura e tamanho do texto, melhor recuperação de artigos sem conteúdo ou removidos e novo ícone da aplicação."
 important = "Os feeds são obtidos diretamente pelo NAS e os artigos são guardados na pasta de dados da aplicação, sem serviços de terceiros. As imagens remotas são carregadas através de um proxy local para remover os parâmetros de rastreamento."

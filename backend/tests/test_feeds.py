@@ -7,17 +7,22 @@ import sys
 import unittest
 import zlib
 from pathlib import Path
+from unittest import mock
 
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
 from shiye.feeds import (
     FeedError,
+    FetchResult,
     _decompress,
     build_opml,
     decode_body,
+    decode_html_body,
     discover_feed_links,
+    fetch_page,
     normalize_feed_url,
+    normalize_page_url,
     parse_date,
     parse_feed,
     parse_opml,
@@ -328,6 +333,57 @@ class OpmlTests(unittest.TestCase):
         for text in ("<opml><head/></opml>", "<not-opml/>", "<opml>"):
             with self.assertRaises(FeedError):
                 parse_opml(text)
+
+
+class PageFetchTests(unittest.TestCase):
+    def test_normalize_page_url(self) -> None:
+        self.assertEqual(
+            normalize_page_url("example.com/post#top"),
+            "https://example.com/post",
+        )
+        for value in (
+            "javascript:alert(1)",
+            "mailto:a@b.test",
+            "ftp://example.com/a",
+            "https://user:pass@example.com/a",
+            "https://example.com:bad/a",
+        ):
+            with self.assertRaises(FeedError):
+                normalize_page_url(value)
+
+    def test_decode_html_body_uses_meta_charset(self) -> None:
+        body = (
+            '<html><head><meta charset="gbk"></head><body>中文内容</body></html>'
+        ).encode("gbk")
+        self.assertIn("中文内容", decode_html_body(body))
+
+    def test_fetch_page_shares_fetch_and_detects_feeds(self) -> None:
+        body = b'<?xml version="1.0"?><rss version="2.0"><channel/></rss>'
+        result = FetchResult(
+            url="https://example.com/feed",
+            final_url="https://example.com/feed",
+            status=200,
+            body=body,
+            content_type="application/rss+xml",
+            charset="utf-8",
+        )
+        with mock.patch("shiye.feeds.fetch", return_value=result):
+            with self.assertRaises(FeedError) as caught:
+                fetch_page("https://example.com/feed")
+        self.assertEqual(caught.exception.code, "is_feed")
+
+    def test_fetch_page_rejects_non_html(self) -> None:
+        result = FetchResult(
+            url="https://example.com/file.pdf",
+            final_url="https://example.com/file.pdf",
+            status=200,
+            body=b"%PDF-1.7",
+            content_type="application/pdf",
+        )
+        with mock.patch("shiye.feeds.fetch", return_value=result):
+            with self.assertRaises(FeedError) as caught:
+                fetch_page("https://example.com/file.pdf")
+        self.assertEqual(caught.exception.code, "not_html")
 
 
 if __name__ == "__main__":

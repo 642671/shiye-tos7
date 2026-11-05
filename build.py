@@ -49,6 +49,7 @@ REQUIRED_FRONTEND = {
 REQUIRED_BACKEND = {
     "__init__.py",
     "feeds.py",
+    "readable.py",
     "sanitize.py",
     "server.py",
     "service.py",

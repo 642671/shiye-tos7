@@ -57,6 +57,10 @@
     return set(order[(index + 1) % order.length]);
   }
 
+  function toggle() {
+    return set(resolve(current) === "dark" ? "light" : "dark");
+  }
+
   if (media) {
     var onChange = function () {
       if (current === "auto") {
@@ -78,6 +82,7 @@
     apply: apply,
     set: set,
     cycle: cycle,
+    toggle: toggle,
   };
 
   apply(readStored());

@@ -372,6 +372,107 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(status, 404)
         self.assertEqual(payload["code"], "article_not_found")
 
+    def save_article(self) -> dict:
+        page = (
+            "<html><head><title>稍后读页面 - 示例站</title>"
+            "<meta property=\"og:site_name\" content=\"示例站\"></head><body>"
+            "<article><p>这是一段足够长的保存链接测试正文，保证可读性提取能够正常工作。"
+            "这里继续补充更多文字，让正文长度稳定超过阈值。</p>"
+            "<p>第二段内容用于确认保存后的文章可以正常打开和重新提取。</p></article>"
+            "</body></html>"
+        )
+        result = FetchResult(
+            url="https://example.com/story",
+            final_url="https://example.com/story",
+            status=200,
+            body=page.encode("utf-8"),
+            content_type="text/html",
+            charset="utf-8",
+        )
+        with mock.patch(
+            "shiye.service.fetch_page", return_value=(result, page)
+        ):
+            status, _, payload = self.harness.json(
+                "POST", "/api/saved", {"url": "https://example.com/story"}
+            )
+        self.assertEqual(status, 201, payload)
+        return payload
+
+    def test_saved_article_routes(self) -> None:
+        payload = self.save_article()
+        article_id = payload["article"]["id"]
+        self.assertTrue(payload["extracted"])
+
+        status, _, listing = self.harness.json("GET", "/api/articles?saved=1")
+        self.assertEqual(status, 200)
+        self.assertEqual(listing["total"], 1)
+        self.assertEqual(listing["items"][0]["feed_kind"], "saved")
+
+        status, _, detail = self.harness.json(
+            "GET", f"/api/articles/{article_id}"
+        )
+        self.assertEqual(status, 200)
+        self.assertIn("保存链接测试正文", detail["article"]["content"])
+
+        status, _, stats = self.harness.json("GET", "/api/stats")
+        self.assertEqual(stats["saved"], 1)
+
+        page = (
+            "<html><head><title>重新提取后的标题</title></head><body><article>"
+            "<p>重新提取的正文同样需要足够长，才能通过可读性识别并更新到数据库中。"
+            "再补充一段文字，确保测试稳定，也让阅读时间统计有实际意义。</p>"
+            "<p>这是第二段补充内容，避免正文刚好卡在可读性阈值附近导致测试结果不稳定。"
+            "保存链接功能需要在各种页面结构下都能给出可靠结果。</p></article></body></html>"
+        )
+        result = FetchResult(
+            url="https://example.com/story",
+            final_url="https://example.com/story",
+            status=200,
+            body=page.encode("utf-8"),
+            content_type="text/html",
+            charset="utf-8",
+        )
+        with mock.patch(
+            "shiye.service.fetch_page", return_value=(result, page)
+        ):
+            status, _, extracted = self.harness.json(
+                "POST", f"/api/articles/{article_id}/extract"
+            )
+        self.assertEqual(status, 200, extracted)
+        self.assertEqual(extracted["article"]["title"], "重新提取后的标题")
+
+        status, _, deleted = self.harness.json(
+            "DELETE", f"/api/articles/{article_id}"
+        )
+        self.assertEqual(status, 200)
+        self.assertTrue(deleted["deleted"])
+        status, _, missing = self.harness.json(
+            "GET", f"/api/articles/{article_id}"
+        )
+        self.assertEqual(status, 404)
+
+    def test_saved_fallback_and_validation(self) -> None:
+        status, _, payload = self.harness.json(
+            "POST",
+            "/api/saved",
+            {"url": "https://example.com/later", "fallback": True},
+        )
+        self.assertEqual(status, 201)
+        self.assertFalse(payload["extracted"])
+        self.assertEqual(payload["article"]["site_name"], "example.com")
+
+        status, _, payload = self.harness.json(
+            "POST", "/api/saved", {"url": "javascript:alert(1)"}
+        )
+        self.assertEqual(status, 400)
+        self.assertEqual(payload["code"], "invalid_url")
+
+        status, _, payload = self.harness.json(
+            "POST", "/api/articles/mark-all-read", {"saved": True}
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["changed"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

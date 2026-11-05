@@ -1,16 +1,18 @@
 Package: shiye
-Version: 0.1.0
+Version: 0.2.0
 Architecture: amd64
 Maintainer: Yuii <yuii@localhost>
 Section: utils
 Priority: optional
 Depends: python3 (>= 3.10), systemd
-Description: RSS and Atom feed reader for TOS 7
- Shiye is a self-hosted feed reader that runs entirely on the NAS.
- It supports RSS 2.0, RSS 1.0, Atom 1.0, OPML import and export, categories,
- unread and starred states, full-text search, scheduled refresh with
- conditional HTTP requests, and a keyboard-friendly three-pane interface.
+Description: RSS, Atom and read-later reading inbox for TOS 7
+ Shiye is a self-hosted reading inbox that runs entirely on the NAS.
+ It reads RSS 2.0, RSS 1.0 and Atom 1.0, and can also save any web page
+ for later with server-side article extraction. It supports categories,
+ OPML import and export, unread and starred states, full-text search,
+ scheduled refresh with conditional HTTP requests, and a keyboard-friendly
+ three-pane interface with a focused reading view.
  .
- Feeds are fetched over HTTP(S) by the application user. Article HTML is
- sanitized on the server before it is stored, remote images are proxied,
- and tracking parameters are removed from links.
+ Feeds and saved pages are fetched over HTTP(S) by the application user.
+ Article HTML is sanitized on the server before it is stored, remote
+ images are proxied, and tracking parameters are removed from links.
